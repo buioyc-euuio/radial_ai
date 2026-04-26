@@ -1,0 +1,229 @@
+@import "tailwindcss";
+
+* {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+/* React Flow overrides */
+.react-flow__renderer { background: transparent; }
+.react-flow__controls {
+  box-shadow: 0 2px 12px rgba(236, 72, 153, 0.12) !important;
+  border: 1px solid #fce7f3 !important;
+  border-radius: 12px !important;
+  overflow: hidden;
+}
+.react-flow__controls-button {
+  background: white !important;
+  border-bottom: 1px solid #fce7f3 !important;
+  color: #ec4899 !important;
+}
+.react-flow__controls-button:hover {
+  background: #fdf2f8 !important;
+}
+.react-flow__minimap {
+  border: 1px solid #fce7f3 !important;
+  border-radius: 12px !important;
+  overflow: hidden;
+  box-shadow: 0 2px 12px rgba(236, 72, 153, 0.1) !important;
+}
+.react-flow__edge-path {
+  stroke: url(#edge-gradient) !important;
+  stroke-width: 2;
+}
+
+/* ── Reading panel markdown content ──────────────────────────────── */
+.reading-panel-content {
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 15px;
+  line-height: 1.8;
+  color: #374151;
+  max-width: 680px;
+}
+.reading-panel-content h1,
+.reading-panel-content h2,
+.reading-panel-content h3 {
+  font-weight: 700;
+  margin: 1em 0 0.4em;
+  color: #1f2937;
+}
+.reading-panel-content h1 { font-size: 1.4em; }
+.reading-panel-content h2 { font-size: 1.2em; }
+.reading-panel-content h3 { font-size: 1.05em; }
+.reading-panel-content p { margin: 0 0 0.75em; }
+.reading-panel-content strong { color: #1f2937; }
+.reading-panel-content code {
+  background: #fdf2f8;
+  color: #be185d;
+  padding: 0.15em 0.4em;
+  border-radius: 4px;
+  font-size: 0.875em;
+  font-family: ui-monospace, monospace;
+  border: 1px solid #fce7f3;
+}
+.reading-panel-content pre {
+  background: #1e1b4b;
+  color: #e0e7ff;
+  padding: 1em 1.2em;
+  border-radius: 12px;
+  overflow-x: auto;
+  margin: 0.8em 0;
+}
+.reading-panel-content pre code {
+  background: transparent;
+  border: none;
+  color: #e0e7ff;
+  padding: 0;
+}
+.reading-panel-content ul,
+.reading-panel-content ol {
+  padding-left: 1.6em;
+  margin: 0.4em 0 0.75em;
+}
+.reading-panel-content li { margin-bottom: 0.25em; }
+.reading-panel-content blockquote {
+  border-left: 3px solid #f9a8d4;
+  padding-left: 1em;
+  color: #6b7280;
+  margin: 0.6em 0;
+  font-style: italic;
+}
+
+/* ── Legacy canvas node content (kept for compatibility) ─────────── */
+.thought-node-content {
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+  line-height: 1.7;
+  color: #374151;
+}
+.thought-node-content p { margin: 0 0 0.5em; }
+.thought-node-content code {
+  background: #fdf2f8;
+  color: #be185d;
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+  font-size: 0.875em;
+  font-family: ui-monospace, monospace;
+  border: 1px solid #fce7f3;
+}
+
+mark.highlight {
+  background: linear-gradient(120deg, #fbcfe8, #bfdbfe);
+  color: inherit;
+  border-radius: 2px;
+  padding: 0 2px;
+}
+
+mark.radial-highlight {
+  background: #fef08a;
+  color: inherit;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+.annotation-note:empty::before {
+  content: attr(data-placeholder);
+  color: #d1d5db;
+  pointer-events: none;
+}
+
+/* ── Theme tokens ─────────────────────────────────────────────── */
+:root {
+  --bg-base: #ffffff;
+  --bg-surface: #fafafa;
+  --bg-topbar: rgba(255,255,255,0.92);
+  --bg-input-palette: rgba(255,255,255,0.95);
+  --bg-overlay: rgba(255,255,255,0.97);
+  --bg-subtle: #fdf2f8;
+  --bg-subtle-blue: #eff6ff;
+  --bg-inactive: #fafbff;
+  --bg-node-header: linear-gradient(90deg,#fdf2f8,#eff6ff);
+  --bg-node-header-active: linear-gradient(90deg,#fce7f3,#dbeafe);
+  --bg-panel-header: linear-gradient(135deg,#fdf2f8,#eff6ff);
+  --border-base: #fce7f3;
+  --border-accent: #f9a8d4;
+  --border-inactive: #f3f4f6;
+  --text-primary: #1f2937;
+  --text-body: #374151;
+  --text-secondary: #4b5563;
+  --text-muted: #6b7280;
+  --text-faint: #9ca3af;
+  --text-placeholder: #d1d5db;
+  --shadow-sm: rgba(236,72,153,0.07);
+  --shadow-md: rgba(236,72,153,0.12);
+  --shadow-lg: rgba(236,72,153,0.18);
+  --shadow-topbar: rgba(236,72,153,0.06);
+  --canvas-dots: #fce7f3;
+}
+
+[data-theme="dark"] {
+  --bg-base: #0d0d0d;
+  --bg-surface: #141414;
+  --bg-topbar: rgba(13,13,13,0.92);
+  --bg-input-palette: rgba(18,18,18,0.97);
+  --bg-overlay: rgba(22,22,22,0.98);
+  --bg-subtle: #1e1218;
+  --bg-subtle-blue: #111828;
+  --bg-inactive: #1a1a1a;
+  --bg-node-header: linear-gradient(90deg,#1e1218,#111828);
+  --bg-node-header-active: linear-gradient(90deg,#2d1520,#0f1a30);
+  --bg-panel-header: linear-gradient(135deg,#1e1218,#111828);
+  --border-base: rgba(244,114,182,0.15);
+  --border-accent: rgba(244,114,182,0.35);
+  --border-inactive: rgba(255,255,255,0.07);
+  --text-primary: #f1f5f9;
+  --text-body: #cbd5e1;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --text-faint: #475569;
+  --text-placeholder: #334155;
+  --shadow-sm: rgba(0,0,0,0.3);
+  --shadow-md: rgba(0,0,0,0.4);
+  --shadow-lg: rgba(0,0,0,0.5);
+  --shadow-topbar: rgba(0,0,0,0.2);
+  --canvas-dots: rgba(244,114,182,0.12);
+}
+
+/* root background */
+[data-theme="dark"] body,
+[data-theme="dark"] #root { background: var(--bg-base); }
+
+/* Tailwind gray text overrides for dark mode */
+[data-theme="dark"] .text-gray-800 { color: var(--text-primary) !important; }
+[data-theme="dark"] .text-gray-700 { color: var(--text-body) !important; }
+[data-theme="dark"] .text-gray-600 { color: var(--text-secondary) !important; }
+[data-theme="dark"] .text-gray-500 { color: var(--text-muted) !important; }
+[data-theme="dark"] .text-gray-400 { color: var(--text-faint) !important; }
+[data-theme="dark"] .text-gray-300 { color: var(--text-placeholder) !important; }
+
+/* ReactFlow dark mode */
+[data-theme="dark"] .react-flow__controls-button {
+  background: var(--bg-surface) !important;
+  border-bottom-color: var(--border-base) !important;
+}
+[data-theme="dark"] .react-flow__controls-button:hover {
+  background: var(--bg-subtle) !important;
+}
+[data-theme="dark"] .react-flow__controls { border-color: var(--border-base) !important; }
+[data-theme="dark"] .react-flow__minimap { border-color: var(--border-base) !important; }
+
+/* Reading panel content dark */
+[data-theme="dark"] .reading-panel-content { color: var(--text-body); }
+[data-theme="dark"] .reading-panel-content h1,
+[data-theme="dark"] .reading-panel-content h2,
+[data-theme="dark"] .reading-panel-content h3 { color: var(--text-primary); }
+[data-theme="dark"] .reading-panel-content strong { color: var(--text-primary); }
+[data-theme="dark"] .reading-panel-content code {
+  background: var(--bg-subtle);
+  border-color: var(--border-base);
+}
+[data-theme="dark"] .reading-panel-content blockquote { color: var(--text-muted); }
+[data-theme="dark"] .thought-node-content { color: var(--text-body); }
