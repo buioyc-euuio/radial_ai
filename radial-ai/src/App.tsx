@@ -18,6 +18,7 @@ import PlaceholderNode from './components/PlaceholderNode';
 import ReadingPanel from './components/ReadingPanel';
 import GlobalInputPalette from './components/GlobalInputPalette';
 import ApiKeyModal from './components/ApiKeyModal';
+import UsageBar from './components/UsageBar';
 import HomePage from './components/HomePage';
 
 const nodeTypes: NodeTypes = {
@@ -389,6 +390,7 @@ function CanvasView() {
       <GlobalInputPalette />
 
       {showApiModal && <ApiKeyModal onClose={() => setShowApiModal(false)} />}
+      <UsageBar />
     </div>
   );
 }

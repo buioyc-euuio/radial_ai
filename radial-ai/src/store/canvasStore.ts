@@ -7,6 +7,7 @@ import {
 import { v4 as uuidv4 } from 'uuid';
 import { get as idbGet, set as idbSet, del as idbDel } from 'idb-keyval';
 import type { NodeData, ContextCapsule, ThoughtNodeData, AnnotationNodeData } from './types';
+import { useAuthStore } from './authStore';
 
 const NODE_WIDTH = 220;
 const NODE_VERTICAL_GAP = 60;
@@ -335,6 +336,24 @@ async function callAI(
   model: string, anthropicKey: string, geminiKey: string,
   messages: { role: 'user' | 'assistant'; content: string }[]
 ): Promise<string> {
+  const { devMode, credential, isWhitelisted } = useAuthStore.getState();
+
+  // Dev mode: route through backend proxy (uses server PROD_API_KEY, model locked server-side)
+  if (devMode && isWhitelisted && credential) {
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ credential, messages, system: TITLE_SYSTEM_PROMPT }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error((err as { error?: string }).error ?? `Server error ${res.status}`);
+    }
+    const data = await res.json() as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
+    return data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+  }
+
+  // BYOK: direct browser-to-API calls
   if (getModelProvider(model) === 'google') {
     if (!geminiKey) throw new Error('Please set your Google Gemini API key in Settings.');
     return callGeminiAPI(geminiKey, model, messages, TITLE_SYSTEM_PROMPT);
@@ -361,7 +380,7 @@ export const useCanvasStore = create<CanvasStore>()(
       // Settings
       apiKey: '',
       geminiApiKey: '',
-      model: 'claude-sonnet-4-6',
+      model: 'gemini-3.1-flash-lite-preview',
       theme: 'light',
       tutorialSeeded: false,
 
@@ -483,10 +502,9 @@ export const useCanvasStore = create<CanvasStore>()(
       },
 
       deleteNode: (nodeId) => set((state) => {
-        const nodes = state.nodes.map(n =>
-          n.id === nodeId ? { ...n, data: { type: 'placeholderNode' as const, isDeleted: true as const } } : n
-        );
-        return { nodes, ...syncProject(state.projects, state.currentProjectId, nodes, state.edges) };
+        const nodes = state.nodes.filter(n => n.id !== nodeId);
+        const edges = state.edges.filter(e => e.source !== nodeId && e.target !== nodeId);
+        return { nodes, edges, ...syncProject(state.projects, state.currentProjectId, nodes, edges) };
       }),
 
       updateNodePrompt: (nodeId, prompt) => set((state) => {

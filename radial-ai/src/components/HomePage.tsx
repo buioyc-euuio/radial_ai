@@ -1,8 +1,71 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
+import { GoogleLogin, type CredentialResponse } from '@react-oauth/google';
 import { useCanvasStore } from '../store/canvasStore';
+import { useAuthStore, type GoogleUser } from '../store/authStore';
 import ApiKeyModal from './ApiKeyModal';
+import UsageBar from './UsageBar';
 import { getModelProvider } from '../store/canvasStore';
 import logo from '../assets/logo-transparent.png';
+
+const GOOGLE_CLIENT_ID_SET = !!import.meta.env.VITE_GOOGLE_CLIENT_ID;
+
+function decodeJwt(token: string): Record<string, string> {
+  const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+  const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+  return JSON.parse(new TextDecoder().decode(bytes));
+}
+
+// Uses the credential (ID-token) flow — only needs Authorized JavaScript origins,
+// no redirect URI configuration required in Google Cloud Console.
+async function checkWhitelist(credential: string): Promise<boolean> {
+  try {
+    const r = await fetch('/api/check-whitelist', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ credential }),
+    });
+    const data = await r.json() as { isWhitelisted?: boolean };
+    return data.isWhitelisted ?? false;
+  } catch { return false; }
+}
+
+function GoogleLoginBtn({ onLogin }: { onLogin: (u: GoogleUser, credential: string) => void }) {
+  const btnRef = useRef<HTMLDivElement>(null);
+
+  const handleCredential = (credentialResponse: CredentialResponse) => {
+    if (!credentialResponse.credential) return;
+    const payload = decodeJwt(credentialResponse.credential);
+    onLogin({ name: payload.name, email: payload.email, picture: payload.picture }, credentialResponse.credential);
+  };
+
+  return (
+    <div className="relative flex items-center">
+      {/* Visible custom button — click triggers the hidden GoogleLogin button */}
+      <button
+        onClick={() => btnRef.current?.querySelector<HTMLElement>('[role=button]')?.click()}
+        className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all"
+        style={{
+          background: 'linear-gradient(135deg,#fff,#f1f5f9)',
+          color: '#374151',
+          border: '1px solid #d1d5db',
+          boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
+        }}
+      >
+        <svg width="14" height="14" viewBox="0 0 48 48">
+          <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+          <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+          <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+          <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+        </svg>
+        登入
+      </button>
+      {/* Hidden GoogleLogin renders the real button that handles the OAuth flow */}
+      <div ref={btnRef} style={{ position: 'absolute', opacity: 0, pointerEvents: 'none', width: 1, height: 1, overflow: 'hidden' }}>
+        <GoogleLogin onSuccess={handleCredential} onError={() => {}} useOneTap={false} />
+      </div>
+    </div>
+  );
+}
 
 // ── Theme icons ───────────────────────────────────────────────────────────────
 
@@ -34,6 +97,13 @@ function timeAgo(ts: number): string {
 
 export default function HomePage() {
   const { projects, createProject, openProject, deleteProject, renameProject, apiKey, geminiApiKey, model, theme, toggleTheme } = useCanvasStore();
+  const { user, login, logout, isWhitelisted, setWhitelisted } = useAuthStore();
+
+  const handleLogin = async (u: GoogleUser, credential: string) => {
+    login(u, credential);
+    const wl = await checkWhitelist(credential);
+    setWhitelisted(wl);
+  };
   const [showNewModal, setShowNewModal] = useState(false);
   const [newName, setNewName] = useState('');
   const [showApiModal, setShowApiModal] = useState(false);
@@ -91,6 +161,33 @@ export default function HomePage() {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Google auth */}
+          {GOOGLE_CLIENT_ID_SET && (
+            user ? (
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5">
+                  {user.picture && (
+                    <img src={user.picture} alt={user.name} className="w-6 h-6 rounded-full object-cover flex-shrink-0" referrerPolicy="no-referrer" />
+                  )}
+                  <span className="text-xs font-semibold hidden sm:inline" style={{ color: 'var(--text-body)' }}>
+                    {isWhitelisted ? `尊貴的測試者 ${user.name.split(' ')[0]}，您好` : `${user.name.split(' ')[0]}，你好`}
+                  </span>
+                </div>
+                <button
+                  onClick={logout}
+                  className="text-xs px-2.5 py-1 rounded-lg transition-all"
+                  style={{ color: 'var(--text-faint)', border: '1px solid var(--border-base)' }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = '#f87171'; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--text-faint)'; }}
+                >
+                  登出
+                </button>
+              </div>
+            ) : (
+              <GoogleLoginBtn onLogin={handleLogin} />
+            )
+          )}
+
           {/* Theme toggle */}
           <button
             onClick={toggleTheme}
@@ -128,9 +225,15 @@ export default function HomePage() {
         <div className="mb-10 mt-2">
           <h1 className="text-4xl font-bold mb-2"
             style={{ background: 'linear-gradient(90deg,#ec4899,#3b82f6)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-            Your Canvases
+            {user
+              ? isWhitelisted
+                ? `尊貴的測試者 ${user.name.split(' ')[0]}，您好`
+                : `${user.name.split(' ')[0]}，你好`
+              : 'Your Canvases'}
           </h1>
-          <p className="text-sm" style={{ color: 'var(--text-faint)' }}>Each canvas is an infinite space for AI-powered thinking.</p>
+          <p className="text-sm" style={{ color: 'var(--text-faint)' }}>
+            {user ? `歡迎回來，${user.email}` : 'Each canvas is an infinite space for AI-powered thinking.'}
+          </p>
         </div>
 
         {/* New canvas button + grid */}
@@ -342,6 +445,7 @@ export default function HomePage() {
       )}
 
       {showApiModal && <ApiKeyModal onClose={() => setShowApiModal(false)} />}
+      <UsageBar />
     </div>
   );
 }

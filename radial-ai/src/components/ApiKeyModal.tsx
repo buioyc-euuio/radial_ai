@@ -1,24 +1,27 @@
 import { useState } from 'react';
 import { useCanvasStore } from '../store/canvasStore';
 import { getModelProvider } from '../store/canvasStore';
+import { useAuthStore } from '../store/authStore';
 
 const MODEL_GROUPS = [
   {
     provider: 'anthropic' as const,
     label: 'Anthropic — Claude',
     models: [
-      { id: 'claude-sonnet-4-6', label: 'Sonnet 4.6' },
-      { id: 'claude-opus-4-7', label: 'Opus 4.7' },
-      { id: 'claude-haiku-4-5-20251001', label: 'Haiku 4.5' },
+      { id: 'claude-sonnet-4-6', label: 'Sonnet 4.6', devOnly: false },
+      { id: 'claude-opus-4-7', label: 'Opus 4.7', devOnly: false },
+      { id: 'claude-haiku-4-5-20251001', label: 'Haiku 4.5', devOnly: false },
     ],
   },
   {
     provider: 'google' as const,
     label: 'Google — Gemini',
     models: [
-      { id: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro' },
-      { id: 'gemini-3-flash-preview', label: 'Gemini 3 Flash' },
-      { id: 'gemini-3.1-flash-lite-preview', label: 'Gemini 3.1 Flash Lite' },
+      { id: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro', devOnly: true },
+      { id: 'gemini-3-flash-preview', label: 'Gemini 3 Flash', devOnly: false },
+      { id: 'gemini-3.1-flash-lite-preview', label: 'Gemini 3.1 Flash Lite', devOnly: false, recommended: true },
+      { id: 'gemma-3-27b-it', label: 'Gemma 3 27B', devOnly: false },
+      { id: 'gemma-4-31b-it', label: 'Gemma 4 31B', devOnly: false },
     ],
   },
 ];
@@ -28,6 +31,7 @@ const DEV_MODE_AVAILABLE = !!DEV_GEMINI_KEY && DEV_GEMINI_KEY !== 'your_gemini_a
 
 export default function ApiKeyModal({ onClose }: { onClose: () => void }) {
   const { apiKey, geminiApiKey, model, setApiKey, setGeminiApiKey, setModel, theme } = useCanvasStore();
+  const { isWhitelisted, devMode, setDevMode } = useAuthStore();
   const [anthropicInput, setAnthropicInput] = useState(apiKey);
   const [geminiInput, setGeminiInput] = useState(geminiApiKey);
   const [selectedModel, setSelectedModel] = useState(model);
@@ -150,16 +154,25 @@ export default function ApiKeyModal({ onClose }: { onClose: () => void }) {
                     {group.label}
                   </div>
                   <div className="grid grid-cols-2 gap-1.5">
-                    {group.models.map((m) => {
+                    {group.models.filter(m => !m.devOnly || DEV_MODE_AVAILABLE).map((m) => {
                       const active = selectedModel === m.id;
+                      const lockedOut = devMode && isWhitelisted && m.id !== 'gemini-3.1-flash-lite-preview';
                       return (
                         <button
                           key={m.id}
-                          onClick={() => setSelectedModel(m.id)}
-                          className="text-left text-xs px-3 py-2 rounded-xl transition-all font-medium"
-                          style={active ? activeModelStyle(group.provider) : inactiveModelStyle}
+                          onClick={() => !lockedOut && setSelectedModel(m.id)}
+                          disabled={lockedOut}
+                          title={lockedOut ? '白名單模式已鎖定此模型' : (m as { recommended?: boolean }).recommended ? 'Recommended' : undefined}
+                          className="text-left text-xs px-3 py-2 rounded-xl transition-all font-medium flex items-center gap-1"
+                          style={lockedOut
+                            ? { ...inactiveModelStyle, opacity: 0.35, cursor: 'not-allowed' }
+                            : active ? activeModelStyle(group.provider) : inactiveModelStyle}
                         >
                           {m.label}
+                          {!lockedOut && (m as { recommended?: boolean }).recommended && (
+                            <span style={{ fontSize: 11 }}>♛</span>
+                          )}
+                          {lockedOut && <span style={{ fontSize: 10, opacity: 0.5 }}>🔒</span>}
                         </button>
                       );
                     })}
@@ -171,6 +184,27 @@ export default function ApiKeyModal({ onClose }: { onClose: () => void }) {
 
           {/* API Keys */}
           <div className="space-y-2.5 mb-5">
+            {devMode && isWhitelisted ? (
+              /* Dev mode: show a single locked placeholder row */
+              <div className="rounded-xl p-3" style={{ background: 'var(--bg-inactive)', border: '1.5px solid var(--border-inactive)', opacity: 0.7 }}>
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>API Key</span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full font-semibold text-white" style={{ background: '#f59e0b' }}>開發者模式</span>
+                </div>
+                <input
+                  type="password"
+                  value="whitelistkey"
+                  readOnly
+                  disabled
+                  className="w-full text-sm rounded-lg px-3 py-2 outline-none cursor-not-allowed"
+                  style={{ ...inputStyle, opacity: 0.6 }}
+                />
+                <p className="text-[10px] mt-1.5" style={{ color: 'var(--text-faint)' }}>
+                  🔒 使用開發者提供的 API Key，無法修改
+                </p>
+              </div>
+            ) : (
+              <>
             {/* Anthropic */}
             <div className="rounded-xl p-3 transition-all" style={anthropicAreaStyle}>
               <label className="flex items-center gap-2 mb-2">
@@ -218,6 +252,8 @@ export default function ApiKeyModal({ onClose }: { onClose: () => void }) {
                 onBlur={(e) => (e.target.style.borderColor = 'var(--border-base)')}
               />
             </div>
+              </>
+            )}
           </div>
 
           {/* Actions */}
@@ -237,12 +273,47 @@ export default function ApiKeyModal({ onClose }: { onClose: () => void }) {
             </button>
           </div>
 
-          {/* Dev Mode */}
-          {DEV_MODE_AVAILABLE && (
-            <div style={{ borderTop: '1px solid var(--border-base)', paddingTop: 12 }}>
+          {/* Whitelist Dev Mode toggle */}
+          <div style={{ borderTop: '1px solid var(--border-base)', paddingTop: 12 }}>
+            {isWhitelisted ? (
+              /* Toggle row */
+              <div className="flex items-center justify-between px-1">
+                <div>
+                  <p className="text-xs font-semibold" style={{ color: isDark ? '#fbbf24' : '#92400e' }}>
+                    Developer Mode
+                  </p>
+                  <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-faint)' }}>
+                    {devMode ? '使用開發者 API Key（模型已鎖定）' : '使用你自己的 API Key'}
+                  </p>
+                </div>
+                {/* Toggle switch */}
+                <button
+                  onClick={() => setDevMode(!devMode)}
+                  className="relative flex-shrink-0 w-10 h-5 rounded-full transition-all"
+                  style={{ background: devMode ? '#f59e0b' : 'var(--bg-inactive)', border: '1.5px solid', borderColor: devMode ? '#f59e0b' : 'var(--border-inactive)' }}
+                  title={devMode ? '關閉 Developer Mode' : '開啟 Developer Mode'}
+                >
+                  <span
+                    className="absolute top-0.5 w-3.5 h-3.5 rounded-full transition-all"
+                    style={{ background: 'white', left: devMode ? 'calc(100% - 1rem)' : '0.1rem', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }}
+                  />
+                </button>
+              </div>
+            ) : (
+              /* Non-whitelisted: show hint */
+              <div className="flex items-center gap-2 px-1 opacity-50 select-none" title="僅限白名單測試人員使用">
+                <span className="text-xs" style={{ color: 'var(--text-faint)' }}>Developer Mode</span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: 'var(--bg-inactive)', color: 'var(--text-faint)', border: '1px solid var(--border-inactive)' }}>
+                  僅限白名單
+                </span>
+              </div>
+            )}
+
+            {/* Legacy local Dev Mode (VITE key) — shown only when available */}
+            {DEV_MODE_AVAILABLE && !isWhitelisted && (
               <button
                 onClick={handleDevMode}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-mono font-semibold transition-all"
+                className="w-full mt-2 flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-mono font-semibold transition-all"
                 style={devModeActive ? {
                   background: isDark ? '#2d2008' : 'linear-gradient(90deg,#fef9c3,#fefce8)',
                   border: '1.5px solid #fde68a',
@@ -252,15 +323,13 @@ export default function ApiKeyModal({ onClose }: { onClose: () => void }) {
                   border: '1.5px dashed var(--border-inactive)',
                   color: 'var(--text-faint)',
                 }}
-                onMouseEnter={(e) => { if (!devModeActive) { (e.currentTarget as HTMLElement).style.borderColor = '#fde68a'; (e.currentTarget as HTMLElement).style.color = isDark ? '#fbbf24' : '#78350f'; } }}
-                onMouseLeave={(e) => { if (!devModeActive) { (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-inactive)'; (e.currentTarget as HTMLElement).style.color = 'var(--text-faint)'; } }}
               >
                 <span className={`w-1.5 h-1.5 rounded-full ${devModeActive ? 'animate-pulse' : ''}`}
                   style={{ background: devModeActive ? '#f59e0b' : 'var(--text-faint)' }} />
-                {devModeActive ? 'Dev Mode Active — VITE_GOOGLE_API_KEY loaded' : 'Dev Mode'}
+                {devModeActive ? 'Local Dev Key Active' : 'Local Dev Key'}
               </button>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
     </div>
