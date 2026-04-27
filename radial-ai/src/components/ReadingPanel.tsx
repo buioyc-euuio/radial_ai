@@ -672,10 +672,10 @@ export default function ReadingPanel() {
             boxShadow: '0 4px 24px var(--shadow-md)', backdropFilter: 'blur(8px)',
           }}
         >
-          <ToolbarButton icon={<IconQuote />}    label="引用"   shortcut="⌘K / L" onClick={() => selectedNodeId && quoteToContext(toolbar.selectedText, selectedNodeId)} />
-          <ToolbarButton icon={<IconHighlight />} label="螢光筆" shortcut="H"      onClick={handleHighlight} />
+          <ToolbarButton icon={<IconQuote />}    label="引用"   shortcut="⌘K / L / C" onClick={() => selectedNodeId && quoteToContext(toolbar.selectedText, selectedNodeId)} />
+          <ToolbarButton icon={<IconHighlight />} label="螢光筆" shortcut="H / F"    onClick={handleHighlight} />
           {toolbar.source !== 'annotation' && (
-            <ToolbarButton icon={<IconNote />}   label="筆記"   shortcut="N"      onClick={handleNote} />
+            <ToolbarButton icon={<IconNote />}   label="筆記"   shortcut="N / A / E" onClick={handleNote} />
           )}
         </div>
       )}
