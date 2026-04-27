@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { kv } from '@vercel/kv';
-import { verifyEmail, checkWhitelisted } from './_whitelist';
+import { verifyEmail, checkWhitelisted } from './_whitelist.js';
 
 const PROD_API_KEY = process.env.PROD_API_KEY ?? '';
 const LOCKED_MODEL = 'gemini-3.1-flash-lite-preview';
