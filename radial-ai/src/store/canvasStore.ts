@@ -12,6 +12,7 @@ const NODE_WIDTH = 220;
 const NODE_VERTICAL_GAP = 60;
 const NODE_HEIGHT_ESTIMATE = 140;
 const BRANCH_HORIZONTAL_GAP = 60;
+const MAIN_TIMELINE_X = 80;
 
 const TITLE_SYSTEM_PROMPT = `After your main response, you MUST append exactly one line in this format:
 <node_title>5-8 word summary of your response</node_title>
@@ -43,49 +44,98 @@ const idbStorage = {
   },
 };
 
-// ── Demo nodes (shown when a new project is created) ─────────────────────────
-const DEMO_NODES: Node<NodeData>[] = [
+// ── Tutorial canvas (pre-created on first load) ───────────────────────────────
+const TUTORIAL_PROJECT_ID = 'tutorial';
+
+const TUTORIAL_NODES: Node<NodeData>[] = [
   {
-    id: 'demo-1', type: 'thoughtNode',
+    id: 'tutorial-1', type: 'thoughtNode',
     position: { x: 80, y: 80 },
     data: {
       type: 'thoughtNode',
-      prompt: 'What is Radial AI?',
-      response: `Radial AI is an innovative chat interface that visualizes conversations as a **tree graph** on an infinite canvas.\n\nUnlike traditional linear chats, Radial AI lets you:\n\n- **Branch** discussions from any specific context\n- **Trace** ancestral history automatically\n- **Quote** precise text segments as context capsules\n- **Visualize** the flow of ideas spatially\n\nThe **left canvas** shows your thought map, while the **right reading panel** gives you a focused, distraction-free reading experience.`,
-      title: 'Infinite canvas AI conversation tool',
+      prompt: '什麼是 Radial AI？',
+      response: `Radial AI 是一個將 AI 對話以**樹狀圖**呈現的無限畫布工具。\n\n不同於傳統的線性聊天，Radial AI 讓你能夠：\n\n- **分支**：從任何節點延伸出新的對話分支\n- **引用**：選取文字並引用為脈絡膠囊，讓 AI 理解你的意圖\n- **視覺化**：在畫布上看見你的思維地圖\n\n**左側畫布** 展示節點結構，**右側閱讀面板** 提供完整的閱讀與互動體驗。\n\n👉 點擊其他節點繼續探索！`,
+      title: 'Radial AI 入門指南',
       isLoading: false, isCollapsed: false,
     },
   },
   {
-    id: 'demo-2', type: 'thoughtNode',
+    id: 'tutorial-2', type: 'thoughtNode',
     position: { x: 80, y: 300 },
     data: {
       type: 'thoughtNode',
-      prompt: 'How does ancestral tracing work?',
-      response: `## Ancestral Tracing\n\nWhen you send a new prompt, Radial AI traces the **directed edges backward** on the canvas to build the conversation history.\n\n### Algorithm\n1. Start from the current node\n2. Follow parent edges upward through the graph\n3. Build a \`messages\` array: \`[user, assistant, user, assistant…]\`\n4. Send only the direct lineage to the AI\n\nThis ensures **precise context** and **lower token cost** — irrelevant conversation branches are never sent.`,
-      title: 'Graph-based ancestral history tracing',
+      prompt: '如何建立新的思考節點？',
+      response: `## 建立節點\n\n在畫面底部的**輸入框**輸入你的問題，按下 **Enter** 發送。\n\n### 兩種新增模式\n\n**1. 主時間線（無引用）**\n輸入框沒有任何引用膠囊時，新節點自動加入**垂直時間線**（左側縱向排列）。\n\n**2. 分支（有引用）**\n先從閱讀面板引用文字，新節點會以**分支**出現在被引用節點的右側，並以箭頭連接。若同時引用多個節點，每個被引用節點都會各自拉一條箭頭指向新節點。\n\n💡 **快速鍵**：按 **⌘/** 聚焦到輸入框`,
+      title: '建立思考節點的方法',
       isLoading: false, isCollapsed: false,
     },
   },
   {
-    id: 'demo-3', type: 'thoughtNode',
-    position: { x: 380, y: 190 },
+    id: 'tutorial-3', type: 'thoughtNode',
+    position: { x: 380, y: 80 },
     data: {
       type: 'thoughtNode',
-      prompt: 'Explain the Split View design',
-      response: `## Split View Architecture\n\nThe interface is divided into two panes:\n\n**Left Pane — Canvas:**\n- Infinite canvas powered by React Flow\n- Thought Cards show only brief summaries\n- Drag, drop, and connect nodes freely\n- Click a card to view its full content\n\n**Right Pane — Reading Panel:**\n- Full prompt and AI response displayed here\n- Select any text to get a floating toolbar\n- Use **Cmd/Ctrl + K** to quote selections as context capsules\n- All text interaction happens here — no canvas pointer conflicts\n\n**Bottom — Global Input Palette:**\n- Type your question and press Enter to send\n- Context Capsules appear here when you quote text from the panel`,
-      title: 'Dual-pane Split View architecture',
+      prompt: '如何引用其他節點的內容？',
+      response: `## 引用功能\n\n1. 點擊左側畫布中的節點 → 右側顯示完整內容\n2. 在右側**選取文字**\n3. 浮動工具列出現 → 點擊 **引用**（或按 **⌘K**）\n4. 選取的文字以**脈絡膠囊**形式出現在輸入框上方\n5. 輸入問題按 Enter → AI 根據引用脈絡回答\n\n### 多重引用\n你可以同時引用**多個節點**的內容！每個被引用的節點都會以**獨立的箭頭**連接到新節點，讓引用關係清晰可見。\n\n### 全節點引用\n按住 **Alt/Shift** 點擊節點，可以將整個節點加入為引用。`,
+      title: '引用與脈絡膠囊功能',
+      isLoading: false, isCollapsed: false,
+    },
+  },
+  {
+    id: 'tutorial-4', type: 'thoughtNode',
+    position: { x: 680, y: 80 },
+    data: {
+      type: 'thoughtNode',
+      prompt: '閱讀面板有哪些互動功能？',
+      response: `## 閱讀面板互動功能\n\n右側閱讀面板是你與內容互動的主要區域：\n\n### 文字操作（選取文字後）\n\n| 快速鍵 | 功能 |\n|--------|------|\n| **⌘K** | 引用到脈絡膠囊 |\n| **H** | 螢光筆（藍色標記） |\n| **N** | 建立側邊筆記 |\n\n### 全域快速鍵\n- **⌘/** → 聚焦輸入框\n- **Alt+點擊節點** → 全節點引用\n\n### 筆記功能\n選取文字後建立筆記，可以在筆記中繼續與 AI 對話，追蹤特定段落的想法。`,
+      title: '閱讀面板的互動功能',
       isLoading: false, isCollapsed: false,
     },
   },
 ];
 
-const DEMO_EDGES: Edge[] = [
-  // demo-1 (x:80) → demo-2 (x:80, below): vertical chain → bottom→top
-  { id: 'e-demo-1-2', source: 'demo-1', target: 'demo-2', sourceHandle: 'source-bottom', targetHandle: 'target-top', type: 'smoothstep', markerEnd: { type: 'arrowclosed' as const }, style: { stroke: '#f472b6' } },
-  // demo-1 (x:80) → demo-3 (x:380, right): horizontal branch → right→left
-  { id: 'e-demo-1-3', source: 'demo-1', target: 'demo-3', sourceHandle: 'source-right', targetHandle: 'target-left', type: 'smoothstep', markerEnd: { type: 'arrowclosed' as const }, style: { stroke: '#f472b6' } },
+const TUTORIAL_EDGES: Edge[] = [
+  { id: 'e-tutorial-1-2', source: 'tutorial-1', target: 'tutorial-2', sourceHandle: 'source-bottom', targetHandle: 'target-top', type: 'smoothstep', markerEnd: { type: 'arrowclosed' as const }, style: { stroke: '#f472b6' } },
+  { id: 'e-tutorial-1-3', source: 'tutorial-1', target: 'tutorial-3', sourceHandle: 'source-right', targetHandle: 'target-left', type: 'smoothstep', markerEnd: { type: 'arrowclosed' as const }, style: { stroke: '#f472b6' } },
+  { id: 'e-tutorial-3-4', source: 'tutorial-3', target: 'tutorial-4', sourceHandle: 'source-right', targetHandle: 'target-left', type: 'smoothstep', markerEnd: { type: 'arrowclosed' as const }, style: { stroke: '#f472b6' } },
 ];
+
+function createTutorialProject(): Project {
+  const now = Date.now();
+  return { id: TUTORIAL_PROJECT_ID, name: 'Tutorial', createdAt: now, updatedAt: now, nodes: TUTORIAL_NODES, edges: TUTORIAL_EDGES };
+}
+
+// ── Main timeline helpers ──────────────────────────────────────────────────────
+
+// Returns the last node in the vertical main timeline chain.
+function getMainTimelineLastNode(nodes: Node<NodeData>[], edges: Edge[]): Node<NodeData> | null {
+  const relevant = nodes.filter(n => n.data.type === 'thoughtNode' || n.data.type === 'placeholderNode');
+  if (relevant.length === 0) return null;
+  const hasIncoming = new Set(edges.map(e => e.target));
+  const roots = relevant.filter(n => !hasIncoming.has(n.id));
+  if (roots.length === 0) return relevant.sort((a, b) => b.position.y - a.position.y)[0];
+  const root = roots.sort((a, b) => a.position.y - b.position.y)[0];
+  const mainEdges = edges.filter(e => e.sourceHandle === 'source-bottom' && e.targetHandle === 'target-top');
+  let current: Node<NodeData> = root;
+  while (true) {
+    const next = mainEdges.find(e => e.source === current.id);
+    if (!next) break;
+    const nextNode = relevant.find(n => n.id === next.target);
+    if (!nextNode) break;
+    current = nextNode;
+  }
+  return current;
+}
+
+// Pick edge handles based on relative position of source→target.
+function getEdgeHandles(srcX: number, srcY: number, tgtX: number, tgtY: number): { sourceHandle: string; targetHandle: string } {
+  const dy = tgtY - srcY;
+  const dx = tgtX - srcX;
+  if (Math.abs(dy) > Math.abs(dx) && dy > 0) {
+    return { sourceHandle: 'source-bottom', targetHandle: 'target-top' };
+  }
+  return { sourceHandle: 'source-right', targetHandle: 'target-left' };
+}
 
 // ── Project (each canvas) ────────────────────────────────────────────────────
 export interface Project {
@@ -95,6 +145,23 @@ export interface Project {
   updatedAt: number;
   nodes: Node<NodeData>[];
   edges: Edge[];
+}
+
+// ── Node navigation history (module-level, not persisted) ────────────────────
+let _navHistory: string[] = [];
+let _navIndex = -1;
+let _isNavigating = false;
+
+function _navPush(id: string) {
+  if (_isNavigating) return;
+  _navHistory = _navHistory.slice(0, _navIndex + 1);
+  _navHistory.push(id);
+  _navIndex = _navHistory.length - 1;
+}
+
+function _navReset() {
+  _navHistory = [];
+  _navIndex = -1;
 }
 
 // ── Store interface ──────────────────────────────────────────────────────────
@@ -115,6 +182,7 @@ interface CanvasStore {
   geminiApiKey: string;
   model: string;
   theme: 'light' | 'dark';
+  tutorialSeeded: boolean;
   toggleTheme: () => void;
 
   // Project management
@@ -138,6 +206,8 @@ interface CanvasStore {
   clearContextCapsules: () => void;
   addFullNodeCapsule: (nodeId: string) => void;
   setSelectedNode: (id: string | null) => void;
+  navigateBack: () => void;
+  navigateForward: () => void;
   deleteNode: (nodeId: string) => void;
   updateNodePrompt: (nodeId: string, prompt: string) => void;
   toggleCollapse: (nodeId: string) => void;
@@ -146,10 +216,14 @@ interface CanvasStore {
   regenerateNode: (nodeId: string) => Promise<void>;
 
   // Inline highlights & annotations (reading panel)
+  updateMarkedHtml: (nodeId: string, html: string) => void;
   addHighlight: (nodeId: string, text: string) => void;
+  addPromptHighlight: (nodeId: string, text: string) => void;
+  addQuoteHighlight: (nodeId: string, text: string) => void;
   addAnnotation: (nodeId: string, selectedText: string) => string;
   updateAnnotation: (nodeId: string, annotationId: string, noteHtml: string) => void;
   deleteAnnotation: (nodeId: string, annotationId: string) => void;
+  addAnnotationMessage: (nodeId: string, annotationId: string, html: string) => void;
 }
 
 // ── Helper: save working nodes/edges back into the projects list ─────────────
@@ -289,22 +363,21 @@ export const useCanvasStore = create<CanvasStore>()(
       geminiApiKey: '',
       model: 'claude-sonnet-4-6',
       theme: 'light',
+      tutorialSeeded: false,
 
       // ── Project management ──────────────────────────────────────────────
       createProject: (name) => {
         const id = uuidv4();
         const now = Date.now();
-        const isFirst = get().projects.length === 0;
-        const initialNodes = isFirst ? DEMO_NODES : [];
-        const initialEdges = isFirst ? DEMO_EDGES : [];
+        _navReset();
         set((state) => ({
-          projects: [{ id, name, createdAt: now, updatedAt: now, nodes: initialNodes, edges: initialEdges }, ...state.projects],
+          projects: [{ id, name, createdAt: now, updatedAt: now, nodes: [], edges: [] }, ...state.projects],
           currentProjectId: id,
           view: 'canvas',
-          nodes: initialNodes,
-          edges: initialEdges,
+          nodes: [],
+          edges: [],
           contextCapsules: [],
-          selectedNodeId: isFirst ? 'demo-1' : null,
+          selectedNodeId: null,
         }));
       },
 
@@ -312,6 +385,7 @@ export const useCanvasStore = create<CanvasStore>()(
         const project = state.projects.find(p => p.id === id);
         if (!project) return {};
         const firstNode = project.nodes.find(n => n.data.type === 'thoughtNode') ?? null;
+        _navReset();
         return {
           currentProjectId: id,
           view: 'canvas',
@@ -322,13 +396,16 @@ export const useCanvasStore = create<CanvasStore>()(
         };
       }),
 
-      closeProject: () => set({
-        view: 'home',
-        nodes: [],
-        edges: [],
-        contextCapsules: [],
-        selectedNodeId: null,
-      }),
+      closeProject: () => {
+        _navReset();
+        set({
+          view: 'home',
+          nodes: [],
+          edges: [],
+          contextCapsules: [],
+          selectedNodeId: null,
+        });
+      },
 
       deleteProject: (id) => set((state) => ({
         projects: state.projects.filter(p => p.id !== id),
@@ -382,7 +459,28 @@ export const useCanvasStore = create<CanvasStore>()(
         }));
       },
 
-      setSelectedNode: (id) => set({ selectedNodeId: id }),
+      setSelectedNode: (id) => {
+        if (id !== null) _navPush(id);
+        set({ selectedNodeId: id });
+      },
+
+      navigateBack: () => {
+        if (_navIndex > 0) {
+          _navIndex--;
+          _isNavigating = true;
+          set({ selectedNodeId: _navHistory[_navIndex] });
+          _isNavigating = false;
+        }
+      },
+
+      navigateForward: () => {
+        if (_navIndex < _navHistory.length - 1) {
+          _navIndex++;
+          _isNavigating = true;
+          set({ selectedNodeId: _navHistory[_navIndex] });
+          _isNavigating = false;
+        }
+      },
 
       deleteNode: (nodeId) => set((state) => {
         const nodes = state.nodes.map(n =>
@@ -430,32 +528,45 @@ export const useCanvasStore = create<CanvasStore>()(
 
       sendPrompt: async (userInput: string) => {
         const { nodes, edges, contextCapsules, apiKey, geminiApiKey, model } = get();
-        const primaryCapsule = contextCapsules.find(c => !c.isFullNode) ?? contextCapsules[0];
-        const primarySourceNodeId = primaryCapsule?.sourceNodeId ?? null;
+
+        // Unique source node IDs from all context capsules (deduped)
+        const referenceSourceIds = [...new Set(contextCapsules.map(c => c.sourceNodeId))].filter(Boolean);
+        const primarySourceNodeId = referenceSourceIds[0] ?? null;
+
         const newNodeId = uuidv4();
-        let newPosition = { x: 0, y: 0 };
-        let parentEdge: Edge | null = null;
+        let newPosition = { x: MAIN_TIMELINE_X, y: 80 };
+        const parentEdges: Edge[] = [];
 
         if (primarySourceNodeId) {
           const sourceNode = nodes.find(n => n.id === primarySourceNodeId);
           if (sourceNode) {
-            const xOffset = edges.filter(e => e.source === primarySourceNodeId).length * (NODE_WIDTH + BRANCH_HORIZONTAL_GAP);
-            newPosition = { x: sourceNode.position.x + NODE_WIDTH + BRANCH_HORIZONTAL_GAP + xOffset, y: sourceNode.position.y };
+            const branchX = sourceNode.position.x + NODE_WIDTH + BRANCH_HORIZONTAL_GAP;
+            const childIds = edges.filter(e => e.source === primarySourceNodeId).map(e => e.target);
+            const children = nodes.filter(n => childIds.includes(n.id));
+            if (children.length === 0) {
+              newPosition = { x: branchX, y: sourceNode.position.y };
+            } else {
+              const lowest = [...children].sort((a, b) => b.position.y - a.position.y)[0];
+              newPosition = { x: branchX, y: lowest.position.y + NODE_HEIGHT_ESTIMATE + NODE_VERTICAL_GAP };
+            }
           }
-          // Branch: new node is to the right → right→left handles
-          parentEdge = { id: `e_${primarySourceNodeId}_${newNodeId}`, source: primarySourceNodeId, target: newNodeId, sourceHandle: 'source-right', targetHandle: 'target-left', type: 'smoothstep', markerEnd: { type: 'arrowclosed' as const }, style: { stroke: '#f472b6' } };
+          // One edge per unique reference source
+          for (const sourceId of referenceSourceIds) {
+            const srcNode = nodes.find(n => n.id === sourceId);
+            if (!srcNode) continue;
+            const { sourceHandle, targetHandle } = getEdgeHandles(srcNode.position.x, srcNode.position.y, newPosition.x, newPosition.y);
+            parentEdges.push({ id: `e_${sourceId}_${newNodeId}`, source: sourceId, target: newNodeId, sourceHandle, targetHandle, type: 'smoothstep', markerEnd: { type: 'arrowclosed' as const }, style: { stroke: '#f472b6' } });
+          }
         } else {
-          const lastMainNode = [...nodes]
-            .filter(n => n.data.type === 'thoughtNode' || n.data.type === 'placeholderNode')
-            .sort((a, b) => b.position.y - a.position.y)[0];
+          // No references: append to main vertical timeline
+          const lastMainNode = getMainTimelineLastNode(nodes, edges);
           if (lastMainNode) {
             newPosition = { x: lastMainNode.position.x, y: lastMainNode.position.y + NODE_HEIGHT_ESTIMATE + NODE_VERTICAL_GAP };
-            // Main chain: new node is below → bottom→top handles
-            parentEdge = { id: `e_${lastMainNode.id}_${newNodeId}`, source: lastMainNode.id, target: newNodeId, sourceHandle: 'source-bottom', targetHandle: 'target-top', type: 'smoothstep', markerEnd: { type: 'arrowclosed' as const }, style: { stroke: '#f472b6' } };
+            parentEdges.push({ id: `e_${lastMainNode.id}_${newNodeId}`, source: lastMainNode.id, target: newNodeId, sourceHandle: 'source-bottom', targetHandle: 'target-top', type: 'smoothstep', markerEnd: { type: 'arrowclosed' as const }, style: { stroke: '#f472b6' } });
           }
         }
 
-        // Compute ancestorIds using materialized path
+        // Compute ancestorIds (primary lineage only)
         let newAncestorIds: string[] = [];
         if (primarySourceNodeId) {
           const sourceNode = nodes.find(n => n.id === primarySourceNodeId);
@@ -466,10 +577,7 @@ export const useCanvasStore = create<CanvasStore>()(
             newAncestorIds = [primarySourceNodeId];
           }
         } else {
-          // Main chain: find the last main node
-          const lastMainNode = [...nodes]
-            .filter(n => n.data.type === 'thoughtNode' || n.data.type === 'placeholderNode')
-            .sort((a, b) => b.position.y - a.position.y)[0];
+          const lastMainNode = getMainTimelineLastNode(nodes, edges);
           if (lastMainNode) {
             if (lastMainNode.data.type === 'thoughtNode') {
               const lastData = lastMainNode.data as ThoughtNodeData;
@@ -491,7 +599,7 @@ export const useCanvasStore = create<CanvasStore>()(
 
         set((state) => {
           const newNodes = [...state.nodes, newNode as Node<NodeData>];
-          const newEdges = parentEdge ? [...state.edges, parentEdge] : state.edges;
+          const newEdges = parentEdges.length > 0 ? [...state.edges, ...parentEdges] : state.edges;
           return { nodes: newNodes, edges: newEdges, contextCapsules: [], selectedNodeId: newNodeId, ...syncProject(state.projects, state.currentProjectId, newNodes, newEdges) };
         });
 
@@ -528,6 +636,14 @@ export const useCanvasStore = create<CanvasStore>()(
       },
 
       // ── Highlights & annotations ────────────────────────────────────────
+      updateMarkedHtml: (nodeId, html) => set((state) => {
+        const nodes = state.nodes.map(n => {
+          if (n.id !== nodeId || n.data.type !== 'thoughtNode') return n;
+          return { ...n, data: { ...n.data, markedHtml: html } as typeof n.data };
+        });
+        return { nodes, ...syncProject(state.projects, state.currentProjectId, nodes, state.edges) };
+      }),
+
       addHighlight: (nodeId, text) => set((state) => {
         const nodes = state.nodes.map(n => {
           if (n.id !== nodeId || n.data.type !== 'thoughtNode') return n;
@@ -538,13 +654,33 @@ export const useCanvasStore = create<CanvasStore>()(
         return { nodes, ...syncProject(state.projects, state.currentProjectId, nodes, state.edges) };
       }),
 
+      addPromptHighlight: (nodeId, text) => set((state) => {
+        const nodes = state.nodes.map(n => {
+          if (n.id !== nodeId || n.data.type !== 'thoughtNode') return n;
+          const d = n.data as ThoughtNodeData;
+          if ((d.promptHighlights ?? []).includes(text)) return n;
+          return { ...n, data: { ...d, promptHighlights: [...(d.promptHighlights ?? []), text] } };
+        });
+        return { nodes, ...syncProject(state.projects, state.currentProjectId, nodes, state.edges) };
+      }),
+
+      addQuoteHighlight: (nodeId, text) => set((state) => {
+        const nodes = state.nodes.map(n => {
+          if (n.id !== nodeId || n.data.type !== 'thoughtNode') return n;
+          const d = n.data as ThoughtNodeData;
+          if ((d.quoteHighlights ?? []).includes(text)) return n;
+          return { ...n, data: { ...d, quoteHighlights: [...(d.quoteHighlights ?? []), text] } };
+        });
+        return { nodes, ...syncProject(state.projects, state.currentProjectId, nodes, state.edges) };
+      }),
+
       addAnnotation: (nodeId, selectedText) => {
         const id = uuidv4();
         set((state) => {
           const nodes = state.nodes.map(n => {
             if (n.id !== nodeId || n.data.type !== 'thoughtNode') return n;
             const d = n.data as ThoughtNodeData;
-            const ann = { id, selectedText, noteHtml: '', createdAt: Date.now() };
+            const ann = { id, selectedText, noteHtml: '', messages: [], createdAt: Date.now() };
             return { ...n, data: { ...d, annotations: [...(d.annotations ?? []), ann] } };
           });
           return { nodes, ...syncProject(state.projects, state.currentProjectId, nodes, state.edges) };
@@ -562,6 +698,26 @@ export const useCanvasStore = create<CanvasStore>()(
               ...d,
               annotations: (d.annotations ?? []).map(a =>
                 a.id === annotationId ? { ...a, noteHtml } : a
+              ),
+            },
+          };
+        });
+        return { nodes, ...syncProject(state.projects, state.currentProjectId, nodes, state.edges) };
+      }),
+
+      addAnnotationMessage: (nodeId, annotationId, html) => set((state) => {
+        const nodes = state.nodes.map(n => {
+          if (n.id !== nodeId || n.data.type !== 'thoughtNode') return n;
+          const d = n.data as ThoughtNodeData;
+          const msg = { id: uuidv4(), html, createdAt: Date.now() };
+          return {
+            ...n,
+            data: {
+              ...d,
+              annotations: (d.annotations ?? []).map(a =>
+                a.id === annotationId
+                  ? { ...a, messages: [...(a.messages ?? []), msg] }
+                  : a
               ),
             },
           };
@@ -625,6 +781,7 @@ export const useCanvasStore = create<CanvasStore>()(
         geminiApiKey: state.geminiApiKey,
         model: state.model,
         theme: state.theme,
+        tutorialSeeded: state.tutorialSeeded,
       }),
       merge: (persisted, current) => {
         const p = persisted as Record<string, unknown>;
@@ -653,6 +810,12 @@ export const useCanvasStore = create<CanvasStore>()(
           }];
         }
 
+        // Seed tutorial project once per install
+        const tutorialSeeded = (p.tutorialSeeded as boolean) ?? false;
+        if (!tutorialSeeded) {
+          projects = [createTutorialProject(), ...projects];
+        }
+
         return {
           ...current,
           projects,
@@ -661,6 +824,7 @@ export const useCanvasStore = create<CanvasStore>()(
           geminiApiKey: (p.geminiApiKey as string) ?? '',
           model,
           theme: (p.theme as 'light' | 'dark') ?? 'light',
+          tutorialSeeded: true,
           view: 'home',
           nodes: [],
           edges: [],

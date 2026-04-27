@@ -1,12 +1,18 @@
-import { memo } from 'react';
+import { memo, useMemo } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import type { ThoughtNodeData } from '../store/types';
 import { useCanvasStore } from '../store/canvasStore';
+import { computeNodeNumbers } from '../utils/nodeNumbers';
 
 function ThoughtNode({ id, data }: NodeProps) {
   const nodeData = data as ThoughtNodeData;
-  const { selectedNodeId, deleteNode } = useCanvasStore();
+  const { selectedNodeId, deleteNode, nodes, edges } = useCanvasStore();
   const isSelected = selectedNodeId === id;
+
+  const nodeNum = useMemo(() => {
+    const map = computeNodeNumbers(nodes, edges);
+    return map.get(id) ?? '';
+  }, [nodes, edges, id]);
 
   if (nodeData.type !== 'thoughtNode') return null;
 
@@ -53,7 +59,7 @@ function ThoughtNode({ id, data }: NodeProps) {
             className="text-[10px] font-bold tracking-wide"
             style={{ background: 'linear-gradient(90deg,#ec4899,#3b82f6)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}
           >
-            Thought
+            Thought {nodeNum ? `#${nodeNum}` : ''}
           </span>
         </div>
         <button

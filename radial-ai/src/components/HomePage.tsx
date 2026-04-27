@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useCanvasStore } from '../store/canvasStore';
 import ApiKeyModal from './ApiKeyModal';
 import { getModelProvider } from '../store/canvasStore';
-import logo from '../assets/logo.png';
+import logo from '../assets/logo-transparent.png';
 
 // ── Theme icons ───────────────────────────────────────────────────────────────
 
@@ -184,12 +184,18 @@ export default function HomePage() {
                     onClick={(e) => e.stopPropagation()}>
                     <button
                       onClick={() => { setRenamingId(project.id); setRenameValue(project.name); }}
-                      className="text-[10px] px-2 py-1 rounded-lg text-gray-400 hover:text-pink-500 hover:bg-pink-50 transition-colors"
+                      className="text-[10px] px-2 py-1 rounded-lg transition-colors"
+                      style={{ color: 'var(--text-faint)' }}
+                      onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = '#ec4899'; (e.currentTarget as HTMLElement).style.background = 'var(--bg-subtle)'; }}
+                      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--text-faint)'; (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
                       title="Rename"
                     >✎</button>
                     <button
                       onClick={() => setConfirmDeleteId(project.id)}
-                      className="text-[10px] px-2 py-1 rounded-lg text-gray-400 hover:text-red-400 hover:bg-red-50 transition-colors"
+                      className="text-[10px] px-2 py-1 rounded-lg transition-colors"
+                      style={{ color: 'var(--text-faint)' }}
+                      onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = '#f87171'; (e.currentTarget as HTMLElement).style.background = 'var(--bg-subtle)'; }}
+                      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--text-faint)'; (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
                       title="Delete"
                     >✕</button>
                   </div>
@@ -273,8 +279,13 @@ export default function HomePage() {
                 autoFocus
               />
               <div className="flex justify-end gap-2">
-                <button onClick={() => setShowNewModal(false)}
-                  className="px-4 py-2 text-sm text-gray-400 hover:text-gray-600 rounded-xl hover:bg-gray-50 transition-colors">
+                <button
+                  onClick={() => setShowNewModal(false)}
+                  className="px-4 py-2 text-sm rounded-xl transition-colors"
+                  style={{ color: 'var(--text-muted)' }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--bg-subtle)'; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+                >
                   Cancel
                 </button>
                 <button onClick={handleCreate}
@@ -301,16 +312,21 @@ export default function HomePage() {
           >
             <div className="h-1" style={{ background: 'linear-gradient(90deg,#f472b6,#a78bfa,#60a5fa)' }} />
             <div className="p-6">
-              <h2 className="font-bold text-base mb-1 text-gray-800">Delete Canvas?</h2>
+              <h2 className="font-bold text-base mb-1" style={{ color: 'var(--text-primary)' }}>Delete Canvas?</h2>
               <p className="text-xs mb-5" style={{ color: 'var(--text-faint)' }}>
-                <strong className="text-gray-600">
+                <strong style={{ color: 'var(--text-secondary)' }}>
                   "{projects.find(p => p.id === confirmDeleteId)?.name}"
                 </strong>{' '}
                 will be permanently deleted.
               </p>
               <div className="flex justify-end gap-2">
-                <button onClick={() => setConfirmDeleteId(null)}
-                  className="px-4 py-2 text-sm text-gray-400 hover:text-gray-600 rounded-xl hover:bg-gray-50 transition-colors">
+                <button
+                  onClick={() => setConfirmDeleteId(null)}
+                  className="px-4 py-2 text-sm rounded-xl transition-colors"
+                  style={{ color: 'var(--text-muted)' }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--bg-subtle)'; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+                >
                   Cancel
                 </button>
                 <button

@@ -27,13 +27,14 @@ const DEV_GEMINI_KEY = import.meta.env.VITE_GOOGLE_API_KEY as string | undefined
 const DEV_MODE_AVAILABLE = !!DEV_GEMINI_KEY && DEV_GEMINI_KEY !== 'your_gemini_api_key_here';
 
 export default function ApiKeyModal({ onClose }: { onClose: () => void }) {
-  const { apiKey, geminiApiKey, model, setApiKey, setGeminiApiKey, setModel } = useCanvasStore();
+  const { apiKey, geminiApiKey, model, setApiKey, setGeminiApiKey, setModel, theme } = useCanvasStore();
   const [anthropicInput, setAnthropicInput] = useState(apiKey);
   const [geminiInput, setGeminiInput] = useState(geminiApiKey);
   const [selectedModel, setSelectedModel] = useState(model);
   const [devModeActive, setDevModeActive] = useState(false);
 
   const activeProvider = getModelProvider(selectedModel);
+  const isDark = theme === 'dark';
 
   const handleDevMode = () => {
     if (!DEV_GEMINI_KEY) return;
@@ -49,15 +50,69 @@ export default function ApiKeyModal({ onClose }: { onClose: () => void }) {
     onClose();
   };
 
+  const activeModelStyle = (provider: 'anthropic' | 'google') => {
+    if (isDark) {
+      return provider === 'anthropic'
+        ? { background: '#2d1520', border: '1.5px solid rgba(244,114,182,0.4)', color: '#f472b6' }
+        : { background: '#0d2416', border: '1.5px solid rgba(52,211,153,0.4)', color: '#34d399' };
+    }
+    return provider === 'anthropic'
+      ? { background: 'linear-gradient(90deg,#fdf2f8,#fce7f3)', border: '1.5px solid #f9a8d4', color: '#be185d' }
+      : { background: 'linear-gradient(90deg,#ecfdf5,#d1fae5)', border: '1.5px solid #6ee7b7', color: '#065f46' };
+  };
+
+  const inactiveModelStyle = {
+    background: 'var(--bg-inactive)',
+    border: '1.5px solid var(--border-inactive)',
+    color: 'var(--text-faint)',
+  };
+
+  const anthropicAreaStyle = {
+    background: activeProvider === 'anthropic' ? 'var(--bg-subtle)' : 'var(--bg-inactive)',
+    border: `1.5px solid ${activeProvider === 'anthropic' ? 'var(--border-accent)' : 'var(--border-inactive)'}`,
+  };
+
+  const geminiAreaStyle = isDark
+    ? {
+        background: activeProvider === 'google' ? '#0d2416' : 'var(--bg-inactive)',
+        border: `1.5px solid ${activeProvider === 'google' ? 'rgba(52,211,153,0.35)' : 'var(--border-inactive)'}`,
+      }
+    : {
+        background: activeProvider === 'google' ? '#f0fdf4' : '#fafbff',
+        border: `1.5px solid ${activeProvider === 'google' ? '#6ee7b7' : '#f3f4f6'}`,
+      };
+
+  const inputStyle = {
+    background: 'var(--bg-base)',
+    border: '1px solid var(--border-base)',
+    color: 'var(--text-body)',
+  };
+
+  const cancelStyle = {
+    color: 'var(--text-muted)',
+    background: 'transparent',
+    border: '1px solid transparent',
+    borderRadius: '12px',
+    padding: '8px 16px',
+    fontSize: '14px',
+    cursor: 'pointer',
+    transition: 'all 0.15s',
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: 'rgba(253,242,248,0.7)', backdropFilter: 'blur(12px)' }}
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{
+        background: isDark ? 'rgba(0,0,0,0.65)' : 'rgba(253,242,248,0.7)',
+        backdropFilter: 'blur(12px)',
+      }}
     >
-      <div className="w-full max-w-md rounded-2xl overflow-hidden"
+      <div
+        className="w-full max-w-md rounded-2xl overflow-hidden"
         style={{
-          background: 'white',
-          border: '1.5px solid #fce7f3',
-          boxShadow: '0 24px 80px rgba(236,72,153,0.15), 0 4px 16px rgba(59,130,246,0.08)',
+          background: 'var(--bg-base)',
+          border: '1.5px solid var(--border-base)',
+          boxShadow: '0 24px 80px var(--shadow-lg)',
         }}
       >
         {/* Top gradient bar */}
@@ -80,7 +135,7 @@ export default function ApiKeyModal({ onClose }: { onClose: () => void }) {
               style={{ background:'linear-gradient(90deg,#ec4899,#3b82f6)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent' }}
             >Settings</h2>
           </div>
-          <p className="text-gray-400 text-sm mb-5">Choose your model and configure API keys.</p>
+          <p className="text-sm mb-5" style={{ color: 'var(--text-muted)' }}>Choose your model and configure API keys.</p>
 
           {/* Model selector */}
           <div className="mb-5">
@@ -91,7 +146,7 @@ export default function ApiKeyModal({ onClose }: { onClose: () => void }) {
               {MODEL_GROUPS.map((group) => (
                 <div key={group.provider}>
                   <div className="text-xs font-semibold mb-1.5"
-                    style={{ color: group.provider === 'anthropic' ? '#be185d' : '#059669' }}>
+                    style={{ color: group.provider === 'anthropic' ? (isDark ? '#f472b6' : '#be185d') : (isDark ? '#34d399' : '#059669') }}>
                     {group.label}
                   </div>
                   <div className="grid grid-cols-2 gap-1.5">
@@ -102,17 +157,7 @@ export default function ApiKeyModal({ onClose }: { onClose: () => void }) {
                           key={m.id}
                           onClick={() => setSelectedModel(m.id)}
                           className="text-left text-xs px-3 py-2 rounded-xl transition-all font-medium"
-                          style={active ? {
-                            background: group.provider === 'anthropic'
-                              ? 'linear-gradient(90deg,#fdf2f8,#fce7f3)'
-                              : 'linear-gradient(90deg,#ecfdf5,#d1fae5)',
-                            border: `1.5px solid ${group.provider === 'anthropic' ? '#f9a8d4' : '#6ee7b7'}`,
-                            color: group.provider === 'anthropic' ? '#be185d' : '#065f46',
-                          } : {
-                            background: '#fafbff',
-                            border: '1.5px solid #f3f4f6',
-                            color: '#9ca3af',
-                          }}
+                          style={active ? activeModelStyle(group.provider) : inactiveModelStyle}
                         >
                           {m.label}
                         </button>
@@ -127,14 +172,10 @@ export default function ApiKeyModal({ onClose }: { onClose: () => void }) {
           {/* API Keys */}
           <div className="space-y-2.5 mb-5">
             {/* Anthropic */}
-            <div className="rounded-xl p-3 transition-all"
-              style={{
-                background: activeProvider === 'anthropic' ? '#fdf2f8' : '#fafbff',
-                border: `1.5px solid ${activeProvider === 'anthropic' ? '#f9a8d4' : '#f3f4f6'}`,
-              }}
-            >
+            <div className="rounded-xl p-3 transition-all" style={anthropicAreaStyle}>
               <label className="flex items-center gap-2 mb-2">
-                <span className="text-xs font-semibold" style={{ color: activeProvider === 'anthropic' ? '#be185d' : '#9ca3af' }}>
+                <span className="text-xs font-semibold"
+                  style={{ color: activeProvider === 'anthropic' ? (isDark ? '#f472b6' : '#be185d') : 'var(--text-muted)' }}>
                   Anthropic API Key
                 </span>
                 {activeProvider === 'anthropic' && (
@@ -142,24 +183,23 @@ export default function ApiKeyModal({ onClose }: { onClose: () => void }) {
                     style={{ background: 'linear-gradient(90deg,#f472b6,#a78bfa)' }}>Active</span>
                 )}
               </label>
-              <input type="password" value={anthropicInput} onChange={(e) => setAnthropicInput(e.target.value)}
+              <input
+                type="password"
+                value={anthropicInput}
+                onChange={(e) => setAnthropicInput(e.target.value)}
                 placeholder="sk-ant-…"
-                className="w-full text-sm rounded-lg px-3 py-2 outline-none text-gray-700 placeholder-pink-200"
-                style={{ background: 'white', border: '1px solid #fce7f3' }}
+                className="w-full text-sm rounded-lg px-3 py-2 outline-none placeholder-pink-200"
+                style={inputStyle}
                 onFocus={(e) => (e.target.style.borderColor = '#f9a8d4')}
-                onBlur={(e) => (e.target.style.borderColor = '#fce7f3')}
+                onBlur={(e) => (e.target.style.borderColor = 'var(--border-base)')}
               />
             </div>
 
             {/* Gemini */}
-            <div className="rounded-xl p-3 transition-all"
-              style={{
-                background: activeProvider === 'google' ? '#f0fdf4' : '#fafbff',
-                border: `1.5px solid ${activeProvider === 'google' ? '#6ee7b7' : '#f3f4f6'}`,
-              }}
-            >
+            <div className="rounded-xl p-3 transition-all" style={geminiAreaStyle}>
               <label className="flex items-center gap-2 mb-2">
-                <span className="text-xs font-semibold" style={{ color: activeProvider === 'google' ? '#059669' : '#9ca3af' }}>
+                <span className="text-xs font-semibold"
+                  style={{ color: activeProvider === 'google' ? (isDark ? '#34d399' : '#059669') : 'var(--text-muted)' }}>
                   Google Gemini API Key
                 </span>
                 {activeProvider === 'google' && (
@@ -167,20 +207,27 @@ export default function ApiKeyModal({ onClose }: { onClose: () => void }) {
                     style={{ background: 'linear-gradient(90deg,#34d399,#60a5fa)' }}>Active</span>
                 )}
               </label>
-              <input type="password" value={geminiInput} onChange={(e) => setGeminiInput(e.target.value)}
+              <input
+                type="password"
+                value={geminiInput}
+                onChange={(e) => setGeminiInput(e.target.value)}
                 placeholder="AIza…"
-                className="w-full text-sm rounded-lg px-3 py-2 outline-none text-gray-700 placeholder-green-200"
-                style={{ background: 'white', border: '1px solid #d1fae5' }}
+                className="w-full text-sm rounded-lg px-3 py-2 outline-none"
+                style={{ ...inputStyle, '--placeholder-color': isDark ? '#334155' : '#bbf7d0' } as React.CSSProperties}
                 onFocus={(e) => (e.target.style.borderColor = '#6ee7b7')}
-                onBlur={(e) => (e.target.style.borderColor = '#d1fae5')}
+                onBlur={(e) => (e.target.style.borderColor = 'var(--border-base)')}
               />
             </div>
           </div>
 
           {/* Actions */}
           <div className="flex justify-end gap-2 mb-3">
-            <button onClick={onClose}
-              className="px-4 py-2 text-sm text-gray-400 hover:text-gray-600 transition-colors rounded-xl hover:bg-gray-50">
+            <button
+              onClick={onClose}
+              style={cancelStyle}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--bg-subtle)'; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+            >
               Cancel
             </button>
             <button onClick={handleSave}
@@ -192,24 +239,24 @@ export default function ApiKeyModal({ onClose }: { onClose: () => void }) {
 
           {/* Dev Mode */}
           {DEV_MODE_AVAILABLE && (
-            <div style={{ borderTop: '1px solid #fce7f3', paddingTop: 12 }}>
+            <div style={{ borderTop: '1px solid var(--border-base)', paddingTop: 12 }}>
               <button
                 onClick={handleDevMode}
                 className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-mono font-semibold transition-all"
                 style={devModeActive ? {
-                  background: 'linear-gradient(90deg,#fef9c3,#fefce8)',
+                  background: isDark ? '#2d2008' : 'linear-gradient(90deg,#fef9c3,#fefce8)',
                   border: '1.5px solid #fde68a',
-                  color: '#92400e',
+                  color: isDark ? '#fbbf24' : '#92400e',
                 } : {
-                  background: '#fafbff',
-                  border: '1.5px dashed #e5e7eb',
-                  color: '#9ca3af',
+                  background: 'var(--bg-inactive)',
+                  border: '1.5px dashed var(--border-inactive)',
+                  color: 'var(--text-faint)',
                 }}
-                onMouseEnter={(e) => { if (!devModeActive) { (e.currentTarget as HTMLElement).style.borderColor = '#fde68a'; (e.currentTarget as HTMLElement).style.color = '#78350f'; } }}
-                onMouseLeave={(e) => { if (!devModeActive) { (e.currentTarget as HTMLElement).style.borderColor = '#e5e7eb'; (e.currentTarget as HTMLElement).style.color = '#9ca3af'; } }}
+                onMouseEnter={(e) => { if (!devModeActive) { (e.currentTarget as HTMLElement).style.borderColor = '#fde68a'; (e.currentTarget as HTMLElement).style.color = isDark ? '#fbbf24' : '#78350f'; } }}
+                onMouseLeave={(e) => { if (!devModeActive) { (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-inactive)'; (e.currentTarget as HTMLElement).style.color = 'var(--text-faint)'; } }}
               >
                 <span className={`w-1.5 h-1.5 rounded-full ${devModeActive ? 'animate-pulse' : ''}`}
-                  style={{ background: devModeActive ? '#f59e0b' : '#d1d5db' }} />
+                  style={{ background: devModeActive ? '#f59e0b' : 'var(--text-faint)' }} />
                 {devModeActive ? 'Dev Mode Active — VITE_GOOGLE_API_KEY loaded' : 'Dev Mode'}
               </button>
             </div>

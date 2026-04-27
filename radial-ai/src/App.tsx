@@ -11,7 +11,7 @@ import {
 import '@xyflow/react/dist/style.css';
 
 import { useCanvasStore, getModelProvider } from './store/canvasStore';
-import logo from './assets/logo.png';
+import logo from './assets/logo-transparent.png';
 import ThoughtNode from './components/ThoughtNode';
 import AnnotationNode from './components/AnnotationNode';
 import PlaceholderNode from './components/PlaceholderNode';
@@ -128,10 +128,21 @@ function CanvasView() {
     nodes, edges,
     onNodesChange, onEdgesChange, onConnect,
     setSelectedNode,
+    navigateBack, navigateForward,
     addFullNodeCapsule,
     apiKey, geminiApiKey, model,
     theme, toggleTheme,
   } = useCanvasStore();
+
+  // Mouse side-button navigation (X1 = back, X2 = forward)
+  useEffect(() => {
+    const onMouseDown = (e: MouseEvent) => {
+      if (e.button === 3) { e.preventDefault(); navigateBack(); }
+      else if (e.button === 4) { e.preventDefault(); navigateForward(); }
+    };
+    window.addEventListener('mousedown', onMouseDown);
+    return () => window.removeEventListener('mousedown', onMouseDown);
+  }, [navigateBack, navigateForward]);
 
   const activeProvider = getModelProvider(model);
   const activeKeySet = activeProvider === 'google' ? !!geminiApiKey : !!apiKey;

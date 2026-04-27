@@ -1,9 +1,16 @@
 export type NodeType = 'thoughtNode' | 'annotationNode' | 'placeholderNode';
 
+export interface AnnotationMessage {
+  id: string;
+  html: string;
+  createdAt: number;
+}
+
 export interface Annotation {
   id: string;
   selectedText: string;
   noteHtml: string;
+  messages?: AnnotationMessage[];
   createdAt: number;
 }
 
@@ -24,7 +31,10 @@ export interface ThoughtNodeData extends Record<string, unknown> {
   isLoading?: boolean;
   isCollapsed?: boolean;
   isDeleted?: boolean;
-  highlights?: string[];
+  markedHtml?: string;          // response HTML with Range-based marks embedded
+  highlights?: string[];        // legacy pen highlight (kept for backward compat)
+  promptHighlights?: string[];  // legacy prompt highlight
+  quoteHighlights?: string[];   // legacy quote highlight
   annotations?: Annotation[];
   type: 'thoughtNode';
 }

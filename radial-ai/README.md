@@ -1,106 +1,97 @@
-# Radial AI ✦
+# Radial AI
 
-An infinite-canvas AI conversation tool. Instead of a boring linear chat, every AI response becomes a **Thought Node** on a canvas — you can branch, annotate, and quote specific passages to build a radial map of ideas.
+將 AI 對話以**樹狀圖**呈現的無限畫布工具。左側畫布展示節點結構，右側閱讀面板提供完整閱讀與互動體驗。
 
 ---
 
-## Quick Start
+## 跑起來 (Quick Start)
 
-### 1. Install dependencies
+### 1. 安裝依賴
 
 ```bash
 cd radial-ai
 npm install
 ```
 
-### 2. (Optional) Set up your API key in `.env` for Dev Mode
-
-Open `.env` and paste your Google Gemini API key:
-
-```env
-VITE_GOOGLE_API_KEY=your_gemini_api_key_here
-```
-
-> You can also enter API keys manually inside the app — no `.env` file required.
-
-### 3. Start the dev server
+### 2. 啟動開發伺服器
 
 ```bash
 npm run dev
 ```
 
-Open **http://localhost:5173** in your browser.
+瀏覽器打開 **http://localhost:5173**。
+
+### 3. 設定 API Key
+
+點右上角 **⚠ Set API Key**，選擇模型並填入 API Key：
+
+- **Anthropic Claude** → [console.anthropic.com](https://console.anthropic.com/)
+- **Google Gemini** → [aistudio.google.com](https://aistudio.google.com/app/apikey)
+
+填完就可以在底部輸入框輸入問題，按 **Enter** 發送。
 
 ---
 
-## First-Time Setup (in the browser)
+## 怎麼用
 
-1. Click **⚠ Set API Key** in the top-right corner.
-2. Choose a model — **Anthropic Claude** or **Google Gemini**.
-3. Paste the corresponding API key and click **Save**.
-   - If you set `VITE_GOOGLE_API_KEY` in `.env`, click **Dev Mode** to load it automatically.
-4. Type a question in the bottom input bar and press **Enter** (or **Return**).
+### 主時間線（無引用）
+直接在底部輸入框輸入問題 → Enter 發送。新節點自動加入**左側垂直時間線**。
 
----
+### 建立分支（有引用）
+1. 點擊左側任意節點 → 右側顯示完整內容
+2. 在右側**選取文字**
+3. 按 **⌘K**（或點浮動工具列的「引用」）→ 文字以**脈絡膠囊**出現在輸入框上方
+4. 輸入問題 → Enter → 新節點以**分支**連接被引用節點
 
-## How to Use
+> 可同時引用多個節點：每個被引用的節點都會各自拉一條箭頭指向新節點。
 
-### Basic conversation
-Type in the bottom bar → press **Enter** to send. Each message + reply appears as a **Thought Node**, chained downward (main timeline).
+### 全節點引用
+**Alt / Shift + 點擊**節點 → 整個節點加入引用。
 
-### Branch the conversation
-1. Hover over any AI response — the cursor turns into a text cursor (`I`).
-2. **Click and drag** to select text.
-3. Press **⌘L** (Mac) or **Ctrl+L** (Windows/Linux) — or click **Quote** in the popup toolbar.
-4. The selected text appears as a **Context Capsule** in the input bar.
-5. Type a new question and send → a new node branches off to the right.
+### 閱讀面板快速鍵
 
-### Annotate a passage
-1. Select text in any response.
-2. Click **Annotate** in the popup toolbar.
-3. A sticky-note **Annotation Node** appears beside the source node — add your own notes and click **Ask AI** to send both the passage and your note as context.
+| 快速鍵 | 功能 |
+|--------|------|
+| **⌘K** (選取後) | 引用文字為脈絡膠囊 |
+| **H** (選取後) | 螢光筆（藍色） |
+| **N** (選取後) | 建立側邊筆記 |
+| **⌘/** | 聚焦底部輸入框 |
+| **Enter** | 發送訊息 |
+| **Shift+Enter** | 輸入框換行 |
 
-### Add a full node as context
-**Shift+Click** or **Alt+Click** any node → the entire node (prompt + response) is added as a Context Capsule.
+### 節點操作
 
-### Node controls (header bar)
-| Action | How |
-|---|---|
-| **Drag node** | Click and drag the pink/blue **header bar** |
-| **Expand / Collapse** | Click **▼ / ▶** in the header |
-| **Immersive View** | Click **⤢** → full-screen reading mode, press **Esc** to close |
-| **Edit prompt** | Double-click the prompt text → edit → press **Enter** to re-generate |
-| **Delete** | Click **✕** → node becomes a placeholder (keeps connections intact) |
-
-### Keyboard shortcuts
-| Shortcut | Action |
-|---|---|
-| **Enter** | Send message |
-| **Shift+Enter** | New line in input |
-| **⌘L / Ctrl+L** | Quote selected text into context |
-| **⌘K / Ctrl+K** | Focus the input bar |
-| **Esc** | Close Immersive View |
+| 動作 | 方法 |
+|------|------|
+| 拖曳節點 | 拖動節點本體 |
+| 刪除節點 | 點標題列右側 **✕** |
+| 切換版面 | 右上角 Canvas / Split / Panel 按鈕 |
 
 ---
 
-## Other npm commands
+## 其他指令
 
 ```bash
-npm run build      # Production build → dist/
-npm run preview    # Preview the production build locally
-npm run lint       # Run ESLint
+npm run build      # 產出 production build → dist/
+npm run preview    # 本地預覽 production build
+npm run lint       # ESLint
 ```
+
+---
+
+## 資料儲存
+
+所有畫布資料存在瀏覽器 **IndexedDB**，無需後端。清除瀏覽器資料即可重置。
 
 ---
 
 ## Tech Stack
 
 | Layer | Library |
-|---|---|
+|-------|---------|
 | Framework | React 19 + TypeScript |
-| Canvas | @xyflow/react (React Flow) |
-| State | Zustand (persisted to IndexedDB) |
+| Canvas | @xyflow/react (React Flow) 12 |
+| State | Zustand 5（IndexedDB persist） |
 | Styling | Tailwind CSS v4 |
-| Markdown | markdown-it |
 | Build | Vite 8 |
 | AI APIs | Anthropic Claude API, Google Gemini API |
