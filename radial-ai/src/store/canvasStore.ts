@@ -795,6 +795,7 @@ export const useCanvasStore = create<CanvasStore>()(
           'gemini-2.0-flash': 'gemini-3-flash-preview',
           'gemini-2.5-pro': 'gemini-3.1-pro-preview',
           'gemini-2.5-pro-preview-05-06': 'gemini-3.1-pro-preview',
+          'gemini-3-pro-preview': 'gemini-3.1-pro-preview',
         };
         const model = typeof p.model === 'string' ? (modelMap[p.model] ?? p.model) : current.model;
 
