@@ -138,7 +138,7 @@ function CanvasView() {
     closeProject,
     nodes, edges,
     onNodesChange, onEdgesChange, onConnect,
-    setSelectedNode,
+    setSelectedNode, selectedNodeId,
     navigateBack, navigateForward,
     addFullNodeCapsule,
     apiKey, geminiApiKey, model,
@@ -154,6 +154,43 @@ function CanvasView() {
     };
     window.addEventListener('mousedown', onMouseDown);
     return () => window.removeEventListener('mousedown', onMouseDown);
+  }, [navigateBack, navigateForward]);
+
+  // Browser back/forward gesture (trackpad swipe, browser nav buttons)
+  // Uses history.pushState counter to determine swipe direction.
+  const _browserCntRef = useRef(0);
+  const _ignorePopRef = useRef(false);
+  useEffect(() => {
+    if (_ignorePopRef.current) { _ignorePopRef.current = false; return; }
+    if (!selectedNodeId) return;
+    _browserCntRef.current++;
+    history.pushState({ _rc: _browserCntRef.current }, '');
+  }, [selectedNodeId]);
+  useEffect(() => {
+    const onPopState = (e: PopStateEvent) => {
+      const newCnt = e.state?._rc ?? 0;
+      _ignorePopRef.current = true;
+      if (newCnt < _browserCntRef.current) navigateBack();
+      else navigateForward();
+      _browserCntRef.current = newCnt;
+      setTimeout(() => { _ignorePopRef.current = false; }, 100);
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, [navigateBack, navigateForward]);
+
+  // Keyboard shortcuts: ⌘[ / ⌘] for back/forward within node history
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey)) return;
+      const t = e.target as HTMLElement;
+      const inInput = t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable;
+      if (inInput) return;
+      if (e.key === '[') { e.preventDefault(); navigateBack(); }
+      else if (e.key === ']') { e.preventDefault(); navigateForward(); }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
   }, [navigateBack, navigateForward]);
 
   const activeProvider = getModelProvider(model);
@@ -280,8 +317,8 @@ function CanvasView() {
           >
             <span>🤖</span>
             {systemPrompt
-              ? <span className="hidden sm:inline font-medium">{personaName || 'Persona'}</span>
-              : <span className="hidden sm:inline">Persona</span>
+              ? <span className="hidden sm:inline font-medium">{personaName || 'GEM自訂'}</span>
+              : <span className="hidden sm:inline">GEM自訂</span>
             }
             {systemPrompt && (
               <span

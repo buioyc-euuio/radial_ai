@@ -136,58 +136,75 @@ mark.highlight {
 
 /* ── Highlight types ──────────────────────────────────────────────────── */
 
-/* 螢光筆 — pen highlight: bright yellow */
+/* 螢光筆 — pen highlight: light translucent yellow */
 mark.pen-highlight,
 mark.radial-highlight {
-  background: #fef08a;
-  color: inherit;
-  border-radius: 2px;
-  padding: 0 1px;
-}
-/* 筆記 — note highlight: light blue, clickable */
-mark.note-highlight {
-  background: #bfdbfe;
+  background: rgba(254, 249, 195, 0.75);  /* yellow-100 @ 75% */
   color: inherit;
   border-radius: 2px;
   padding: 0 1px;
   cursor: pointer;
-  transition: box-shadow 0.15s, padding 0.12s, background 0.15s;
+  transition: background 0.12s;
 }
-mark.note-highlight:hover {
-  box-shadow: 0 0 0 3px rgba(147, 197, 253, 0.55);
-  padding: 2px 3px;
+mark.pen-highlight:hover,
+mark.pen-highlight.active,
+mark.radial-highlight:hover,
+mark.radial-highlight.active {
+  background: rgba(254, 240, 138, 0.9);   /* yellow-200 @ 90% – darker, no size change */
 }
-mark.note-highlight.active {
-  background: #93c5fd;
-  box-shadow: 0 0 0 5px rgba(147, 197, 253, 0.45);
-  padding: 3px 5px;
-  border-radius: 4px;
-}
-/* 引用 — quote highlight: light pink */
-mark.quote-highlight {
-  background: #fce7f3;
+
+/* 筆記 — note highlight: light blue, clickable */
+mark.note-highlight {
+  background: rgba(191, 219, 254, 0.7);   /* blue-200 @ 70% */
   color: inherit;
   border-radius: 2px;
   padding: 0 1px;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+mark.note-highlight:hover,
+mark.note-highlight.active {
+  background: rgba(147, 197, 253, 0.9);   /* blue-300 @ 90% – darker, no size change */
+}
+
+/* 引用 — quote highlight: light translucent pink */
+mark.quote-highlight {
+  background: rgba(252, 231, 243, 0.75);  /* pink-100 @ 75% */
+  color: inherit;
+  border-radius: 2px;
+  padding: 0 1px;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+mark.quote-highlight:hover,
+mark.quote-highlight.active {
+  background: rgba(251, 207, 232, 0.9);   /* pink-200 @ 90% – darker, no size change */
 }
 
 /* Dark mode highlight variants */
 [data-theme="dark"] mark.pen-highlight,
 [data-theme="dark"] mark.radial-highlight {
-  background: rgba(253, 224, 71, 0.3);
+  background: rgba(253, 224, 71, 0.25);
+}
+[data-theme="dark"] mark.pen-highlight:hover,
+[data-theme="dark"] mark.pen-highlight.active,
+[data-theme="dark"] mark.radial-highlight:hover,
+[data-theme="dark"] mark.radial-highlight.active {
+  background: rgba(253, 224, 71, 0.45);
 }
 [data-theme="dark"] mark.note-highlight {
   background: rgba(96, 165, 250, 0.25);
 }
-[data-theme="dark"] mark.note-highlight:hover {
-  box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.35);
-}
+[data-theme="dark"] mark.note-highlight:hover,
 [data-theme="dark"] mark.note-highlight.active {
   background: rgba(96, 165, 250, 0.45);
-  box-shadow: 0 0 0 5px rgba(96, 165, 250, 0.3);
 }
 [data-theme="dark"] mark.quote-highlight {
   background: rgba(244, 114, 182, 0.2);
+}
+[data-theme="dark"] mark.quote-highlight:hover,
+[data-theme="dark"] mark.quote-highlight.active {
+  background: rgba(244, 114, 182, 0.4);
 }
 
 .annotation-note:empty::before {

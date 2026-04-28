@@ -12,7 +12,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!credential) return res.status(401).json({ error: 'Missing credential' });
 
   const email = await verifyEmail(credential);
-  if (!email || !checkWhitelisted(email)) {
+  if (!email || !await checkWhitelisted(email)) {
     return res.status(403).json({ error: 'Not whitelisted' });
   }
 

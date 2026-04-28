@@ -18,6 +18,12 @@ const IconHighlight = () => (
     <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/>
   </svg>
 )
+const IconUnhighlight = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/>
+    <line x1="3" y1="3" x2="21" y2="21"/>
+  </svg>
+)
 const IconNote = () => (
   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
@@ -104,6 +110,8 @@ function applyMarkToRange(range: Range, className: string, container: HTMLElemen
     const startOff = textNode === range.startContainer ? range.startOffset : 0;
     const endOff   = textNode === range.endContainer   ? range.endOffset   : textNode.length;
     if (startOff >= endOff) continue;
+    // Skip whitespace-only segments (e.g. the '\n' node between </p> and <p>)
+    if (!(textNode.textContent?.slice(startOff, endOff).trim())) continue;
 
     // Split at end first (preserves startOff validity)
     if (endOff < textNode.length) textNode.splitText(endOff);
@@ -301,6 +309,8 @@ interface ToolbarState {
   selectedText: string;
   source: SelectionSource;
   annotationId?: string;
+  isOnMark?: boolean;
+  clickedMarkEl?: HTMLElement;
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
@@ -308,11 +318,14 @@ interface ToolbarState {
 export default function ReadingPanel() {
   const {
     selectedNodeId, nodes, edges, setSelectedNode,
-    addContextCapsule, updateMarkedHtml,
+    addContextCapsule, updateMarkedHtml, updateNodeTitle,
     addAnnotation, updateAnnotation, sendPrompt,
   } = useCanvasStore();
 
   const [toolbar, setToolbar] = useState<ToolbarState | null>(null);
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState('');
+  const titleInputRef = useRef<HTMLInputElement>(null);
   const [promptBoxHeight, setPromptBoxHeight] = useState(70);
   const [annotationsPanelOpen, setAnnotationsPanelOpen] = useState(true);
   const [hoveredAnnotationId, setHoveredAnnotationId] = useState<string | null>(null);
@@ -401,9 +414,18 @@ export default function ReadingPanel() {
   // Reset when node changes
   useEffect(() => {
     setToolbar(null);
+    setEditingTitle(false);
     savedRangeRef.current = null;
     window.getSelection()?.removeAllRanges();
   }, [selectedNodeId]);
+
+  // Apply .active class to the mark element that was clicked (for darkened bg)
+  useEffect(() => {
+    const el = toolbar?.clickedMarkEl;
+    if (!el) return;
+    el.classList.add('active');
+    return () => el.classList.remove('active');
+  }, [toolbar]);
 
   // ── Jump to referenced node ───────────────────────────────────────────────
   const handleRefClick = useCallback((sourceNodeId: string, text: string) => {
@@ -456,24 +478,46 @@ export default function ReadingPanel() {
     sendPrompt(promptText);
   }, [selectedNodeId, nodes, addContextCapsule, sendPrompt]);
 
-  // ── Click on note-highlight mark → focus that annotation's input ──────────
+  // ── Click on note-highlight mark → focus annotation input ───────────────
+  // ── Click on pen/quote-highlight mark → show toolbar with Unhighlight ───
   const handleResponseClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     const target = e.target as HTMLElement;
-    const mark = target.closest('mark.note-highlight') as HTMLElement | null;
-    if (!mark) return;
-    const markText = mark.textContent ?? '';
-    const ann = annotations.find(a =>
-      markText && (a.selectedText.includes(markText) || markText.includes(a.selectedText.slice(0, 20)))
-    );
-    if (!ann) return;
-    setAnnotationsPanelOpen(true);
-    setTimeout(() => {
-      const inputEl = document.querySelector(`[data-annotation-id="${ann.id}"] [contenteditable]`) as HTMLElement | null;
-      if (inputEl) {
-        inputEl.focus();
-        inputEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
-    }, 80);
+
+    // note-highlight: open annotation panel
+    const noteMark = target.closest('mark.note-highlight') as HTMLElement | null;
+    if (noteMark) {
+      const markText = noteMark.textContent ?? '';
+      const ann = annotations.find(a =>
+        markText && (a.selectedText.includes(markText) || markText.includes(a.selectedText.slice(0, 20)))
+      );
+      if (!ann) return;
+      setAnnotationsPanelOpen(true);
+      setTimeout(() => {
+        const inputEl = document.querySelector(`[data-annotation-id="${ann.id}"] [contenteditable]`) as HTMLElement | null;
+        if (inputEl) {
+          inputEl.focus();
+          inputEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 80);
+      return;
+    }
+
+    // pen-highlight: show toolbar with Unhighlight button
+    const penMark = target.closest('mark.pen-highlight') as HTMLElement | null;
+    if (penMark && responseRef.current) {
+      const rect = penMark.getBoundingClientRect();
+      const panelRect = panelRef.current?.getBoundingClientRect();
+      setToolbar({
+        x: rect.left + rect.width / 2 - (panelRect?.left ?? 0),
+        y: rect.top - (panelRect?.top ?? 0),
+        selectedText: penMark.textContent ?? '',
+        source: 'response',
+        isOnMark: true,
+        clickedMarkEl: penMark,
+      });
+      savedRangeRef.current = null;
+      window.getSelection()?.removeAllRanges();
+    }
   }, [annotations]);
 
   // ── Quote ─────────────────────────────────────────────────────────────────
@@ -516,6 +560,20 @@ export default function ReadingPanel() {
     setToolbar(null);
     window.getSelection()?.removeAllRanges();
   }, [toolbar, selectedNodeId, updateMarkedHtml, updateAnnotation]);
+
+  // ── Unhighlight (remove pen-highlight from clicked mark) ──────────────────
+  const handleUnhighlight = useCallback(() => {
+    if (!toolbar || !selectedNodeId || !responseRef.current) return;
+    const markEl = toolbar.clickedMarkEl;
+    if (markEl?.parentNode) {
+      while (markEl.firstChild) markEl.parentNode.insertBefore(markEl.firstChild, markEl);
+      markEl.parentNode.removeChild(markEl);
+      responseRef.current.normalize();
+      updateMarkedHtml(selectedNodeId, responseRef.current.innerHTML);
+    }
+    setToolbar(null);
+    savedRangeRef.current = null;
+  }, [toolbar, selectedNodeId, updateMarkedHtml]);
 
   // ── Note ──────────────────────────────────────────────────────────────────
   const handleNote = useCallback(() => {
@@ -631,7 +689,7 @@ export default function ReadingPanel() {
           break;
         case 'KeyH': case 'KeyF':
           e.preventDefault();
-          handleHighlight();
+          if (toolbar.isOnMark) handleUnhighlight(); else handleHighlight();
           break;
         case 'KeyN': case 'KeyA': case 'KeyE':
           if (toolbar.source !== 'annotation') { e.preventDefault(); handleNote(); }
@@ -640,7 +698,7 @@ export default function ReadingPanel() {
     };
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [toolbar, selectedNodeId, quoteToContext, handleHighlight, handleNote]);
+  }, [toolbar, selectedNodeId, quoteToContext, handleHighlight, handleUnhighlight, handleNote]);
 
   // ── Empty state ───────────────────────────────────────────────────────────
   if (!nodeData) {
@@ -672,21 +730,54 @@ export default function ReadingPanel() {
             boxShadow: '0 4px 24px var(--shadow-md)', backdropFilter: 'blur(8px)',
           }}
         >
-          <ToolbarButton icon={<IconQuote />}    label="引用"   shortcut="⌘K / L / C" onClick={() => selectedNodeId && quoteToContext(toolbar.selectedText, selectedNodeId)} />
-          <ToolbarButton icon={<IconHighlight />} label="螢光筆" shortcut="H / F"    onClick={handleHighlight} />
+          <ToolbarButton icon={<IconQuote />} label="引用" shortcut="⌘K / L / C" onClick={() => selectedNodeId && quoteToContext(toolbar.selectedText, selectedNodeId)} />
+          {toolbar.isOnMark
+            ? <ToolbarButton icon={<IconUnhighlight />} label="移除螢光筆" shortcut="H" onClick={handleUnhighlight} />
+            : <ToolbarButton icon={<IconHighlight />}   label="螢光筆"     shortcut="H / F" onClick={handleHighlight} />
+          }
           {toolbar.source !== 'annotation' && (
-            <ToolbarButton icon={<IconNote />}   label="筆記"   shortcut="N / A / E" onClick={handleNote} />
+            <ToolbarButton icon={<IconNote />} label="筆記" shortcut="N / A / E" onClick={handleNote} />
           )}
         </div>
       )}
 
       {/* ── Header: Prompt (resizable) ──────────────────────────────────────── */}
       <div className="flex-shrink-0 flex flex-col px-8 pt-4" style={{ background: 'var(--bg-panel-header)' }}>
-        {nodeData.title && (
-          <h1 className="text-xl font-bold leading-snug m-0 mb-3"
-            style={{ background: 'linear-gradient(90deg,#ec4899,#3b82f6)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-            {nodeData.title}
-          </h1>
+        {/* Editable title */}
+        {editingTitle ? (
+          <input
+            ref={titleInputRef}
+            value={titleDraft}
+            onChange={e => setTitleDraft(e.target.value)}
+            onBlur={() => {
+              if (selectedNodeId) updateNodeTitle(selectedNodeId, titleDraft);
+              setEditingTitle(false);
+            }}
+            onKeyDown={e => {
+              if (e.key === 'Enter') { e.preventDefault(); titleInputRef.current?.blur(); }
+              if (e.key === 'Escape') { setEditingTitle(false); }
+            }}
+            placeholder="Add a title…"
+            className="text-xl font-bold leading-snug m-0 mb-3 w-full bg-transparent outline-none border-b"
+            style={{ color: '#ec4899', borderColor: 'rgba(244,114,182,0.4)' }}
+          />
+        ) : (
+          <div
+            onClick={() => { setTitleDraft(nodeData.title ?? ''); setEditingTitle(true); setTimeout(() => titleInputRef.current?.select(), 0); }}
+            className="mb-3 cursor-text group flex items-center gap-1.5"
+            title="點擊編輯標題"
+          >
+            {nodeData.title ? (
+              <h1 className="text-xl font-bold leading-snug m-0"
+                style={{ background: 'linear-gradient(90deg,#ec4899,#3b82f6)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                {nodeData.title}
+              </h1>
+            ) : (
+              <span className="text-sm italic opacity-0 group-hover:opacity-40 transition-opacity select-none" style={{ color: 'var(--text-faint)' }}>
+                Add title…
+              </span>
+            )}
+          </div>
         )}
         <div className="text-[10px] font-bold tracking-widest mb-1" style={{ color: '#f472b6' }}>PROMPT</div>
 
@@ -737,6 +828,44 @@ export default function ReadingPanel() {
                         style={{ color: 'var(--text-muted)', borderLeft: '2px solid #f9a8d4' }}>
                         &ldquo;{ref.text.length > 90 ? ref.text.slice(0, 90) + '…' : ref.text}&rdquo;
                       </p>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* History — context nodes fed to this node's AI call */}
+          {nodeData.ancestorIds && nodeData.ancestorIds.length > 0 && (
+            <div className="mt-3">
+              <div className="text-[10px] font-bold tracking-widest mb-1.5" style={{ color: '#94a3b8' }}>HISTORY</div>
+              <div className="flex flex-wrap gap-1">
+                {nodeData.ancestorIds.map((ancId) => {
+                  const num = nodeNumbers.get(ancId);
+                  if (!num) return null;
+                  const ancNode = nodes.find(n => n.id === ancId);
+                  const ancTitle = ancNode?.data.type === 'thoughtNode'
+                    ? (ancNode.data as ThoughtNodeData).title ?? (ancNode.data as ThoughtNodeData).prompt.slice(0, 30)
+                    : ancId;
+                  return (
+                    <button
+                      key={ancId}
+                      onClick={() => setSelectedNode(ancId)}
+                      title={ancTitle}
+                      className="text-[10px] font-semibold px-2 py-0.5 rounded-full transition-colors"
+                      style={{ background: 'var(--bg-subtle)', color: 'var(--text-faint)', border: '1px solid var(--border-base)' }}
+                      onMouseEnter={(e) => {
+                        (e.currentTarget as HTMLElement).style.borderColor = '#94a3b8';
+                        (e.currentTarget as HTMLElement).style.color = '#64748b';
+                        (e.currentTarget as HTMLElement).style.background = 'var(--bg-inactive)';
+                      }}
+                      onMouseLeave={(e) => {
+                        (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-base)';
+                        (e.currentTarget as HTMLElement).style.color = 'var(--text-faint)';
+                        (e.currentTarget as HTMLElement).style.background = 'var(--bg-subtle)';
+                      }}
+                    >
+                      #{num}
                     </button>
                   );
                 })}

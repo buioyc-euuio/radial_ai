@@ -10,6 +10,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!credential) return res.json({ isWhitelisted: false });
 
   const email = await verifyEmail(credential);
-  const isWhitelisted = !!email && checkWhitelisted(email);
+  const isWhitelisted = !!email && await checkWhitelisted(email);
   return res.json({ isWhitelisted });
 }

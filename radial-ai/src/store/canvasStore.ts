@@ -8,6 +8,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { get as idbGet, set as idbSet, del as idbDel } from 'idb-keyval';
 import type { NodeData, ContextCapsule, ThoughtNodeData, AnnotationNodeData } from './types';
 import { useAuthStore } from './authStore';
+import { calculateOptimalPosition } from '../utils/autoLayout';
 
 const NODE_WIDTH = 220;
 const NODE_VERTICAL_GAP = 60;
@@ -245,6 +246,7 @@ interface CanvasStore {
   navigateBack: () => void;
   navigateForward: () => void;
   deleteNode: (nodeId: string) => void;
+  updateNodeTitle: (nodeId: string, title: string) => void;
   updateNodePrompt: (nodeId: string, prompt: string) => void;
   toggleCollapse: (nodeId: string) => void;
   addAnnotationNode: (parentNodeId: string, selectedText: string) => void;
@@ -615,6 +617,14 @@ export const useCanvasStore = create<CanvasStore>()(
         return { nodes, edges, ...syncProject(state.projects, state.currentProjectId, nodes, edges) };
       }),
 
+      updateNodeTitle: (nodeId, title) => set((state) => {
+        const nodes = state.nodes.map(n =>
+          n.id === nodeId && n.data.type === 'thoughtNode'
+            ? { ...n, data: { ...n.data, title: title.trim() || undefined } } : n
+        );
+        return { nodes, ...syncProject(state.projects, state.currentProjectId, nodes, state.edges) };
+      }),
+
       updateNodePrompt: (nodeId, prompt) => set((state) => {
         const nodes = state.nodes.map(n =>
           n.id === nodeId && n.data.type === 'thoughtNode'
@@ -682,27 +692,8 @@ export const useCanvasStore = create<CanvasStore>()(
             .map(id => nodes.find(n => n.id === id))
             .filter((n): n is Node<NodeData> => !!n);
 
-          if (parentIds.length === 1) {
-            // Single parent → classic right-side branch
-            const srcNode = parentNodes[0];
-            const branchX = srcNode.position.x + NODE_WIDTH + BRANCH_HORIZONTAL_GAP;
-            const childIds = edges.filter(e => e.source === srcNode.id).map(e => e.target);
-            const children = nodes.filter(n => childIds.includes(n.id));
-            if (children.length === 0) {
-              newPosition = { x: branchX, y: srcNode.position.y };
-            } else {
-              const lowest = [...children].sort((a, b) => b.position.y - a.position.y)[0];
-              newPosition = { x: branchX, y: lowest.position.y + NODE_HEIGHT_ESTIMATE + NODE_VERTICAL_GAP };
-            }
-          } else {
-            // Multiple parents → position below-center of the group
-            const maxY = Math.max(...parentNodes.map(n => n.position.y));
-            const avgX = parentNodes.reduce((s, n) => s + n.position.x + NODE_WIDTH / 2, 0) / parentNodes.length;
-            newPosition = {
-              x: avgX - NODE_WIDTH / 2,
-              y: maxY + NODE_HEIGHT_ESTIMATE + NODE_VERTICAL_GAP,
-            };
-          }
+          // Use auto-layout to find the best collision-free position
+          newPosition = calculateOptimalPosition(parentNodes, nodes);
 
           // One floating edge per parent
           for (const parentId of parentIds) {
