@@ -1,11 +1,31 @@
 import { useState, useRef, useEffect } from 'react';
 import { useCanvasStore } from '../store/canvasStore';
 
+type Scope = 'ancestry' | 'global' | 'custom';
+
+const SCOPE_CONFIG: Record<Scope, { icon: string; label: string; tooltip: string }> = {
+  ancestry: {
+    icon: '🔗',
+    label: '血親路徑',
+    tooltip: '直系血親 (預設): 僅傳送當前節點沿箭頭往上追溯的歷史對話，最省 Token',
+  },
+  global: {
+    icon: '🌐',
+    label: '所有節點',
+    tooltip: '全局歷史: 傳送畫布上所有節點，適合跨分支綜合歸納',
+  },
+  custom: {
+    icon: '👆',
+    label: '自定義',
+    tooltip: '自定義: 在畫布上 Shift+Click 選取特定節點，僅以那些節點的內容作為 Context (不追溯祖先)',
+  },
+};
+
 export default function GlobalInputPalette() {
   const [input, setInput] = useState('');
   const [error, setError] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const { contextCapsules, removeContextCapsule, sendPrompt } = useCanvasStore();
+  const { contextCapsules, removeContextCapsule, sendPrompt, historyScope, setHistoryScope } = useCanvasStore();
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -70,6 +90,49 @@ export default function GlobalInputPalette() {
             ))}
           </div>
         )}
+
+        {/* Context Scope Selector */}
+        <div
+          className="flex items-center gap-1 px-4 py-1.5"
+          style={{ borderBottom: '1px solid var(--border-base)' }}
+        >
+          <span className="text-[10px] font-semibold mr-1.5 flex-shrink-0" style={{ color: 'var(--text-faint)' }}>
+            Context
+          </span>
+          {(Object.entries(SCOPE_CONFIG) as [Scope, typeof SCOPE_CONFIG[Scope]][]).map(([scope, cfg]) => (
+            <button
+              key={scope}
+              onClick={() => setHistoryScope(scope)}
+              title={cfg.tooltip}
+              className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full transition-all whitespace-nowrap"
+              style={historyScope === scope
+                ? {
+                  background: 'linear-gradient(135deg,rgba(244,114,182,0.15),rgba(96,165,250,0.15))',
+                  color: '#be185d',
+                  border: '1px solid rgba(244,114,182,0.4)',
+                  fontWeight: 600,
+                }
+                : {
+                  color: 'var(--text-faint)',
+                  border: '1px solid transparent',
+                }
+              }
+            >
+              <span>{cfg.icon}</span>
+              <span className="hidden sm:inline">{cfg.label}</span>
+            </button>
+          ))}
+          {historyScope === 'custom' && (
+            <span className="text-[9px] ml-1 italic" style={{ color: 'var(--text-faint)' }}>
+              Shift+Click 選取節點
+            </span>
+          )}
+          {historyScope === 'global' && (
+            <span className="text-[9px] ml-1 italic" style={{ color: 'var(--text-faint)' }}>
+              ⚠ 高 Token 消耗
+            </span>
+          )}
+        </div>
 
         {/* Input row */}
         <div className="flex items-end gap-3 px-4 py-3">

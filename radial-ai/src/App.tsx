@@ -6,6 +6,7 @@ import {
   MiniMap,
   BackgroundVariant,
   type NodeTypes,
+  type EdgeTypes,
   type Node,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
@@ -19,12 +20,21 @@ import ReadingPanel from './components/ReadingPanel';
 import GlobalInputPalette from './components/GlobalInputPalette';
 import ApiKeyModal from './components/ApiKeyModal';
 import UsageBar from './components/UsageBar';
+import FloatingEdge from './components/FloatingEdge';
+import PersonaModal from './components/PersonaModal';
 import HomePage from './components/HomePage';
 
 const nodeTypes: NodeTypes = {
   thoughtNode: ThoughtNode,
   annotationNode: AnnotationNode,
   placeholderNode: PlaceholderNode,
+};
+
+// All edge types use the floating (dynamic border-point) renderer
+const edgeTypes: EdgeTypes = {
+  floatingEdge: FloatingEdge,
+  smoothstep: FloatingEdge,  // retrofit existing edges too
+  default: FloatingEdge,
 };
 
 type ViewMode = 'split' | 'canvas' | 'panel';
@@ -133,6 +143,7 @@ function CanvasView() {
     addFullNodeCapsule,
     apiKey, geminiApiKey, model,
     theme, toggleTheme,
+    systemPrompt, personaName,
   } = useCanvasStore();
 
   // Mouse side-button navigation (X1 = back, X2 = forward)
@@ -148,6 +159,7 @@ function CanvasView() {
   const activeProvider = getModelProvider(model);
   const activeKeySet = activeProvider === 'google' ? !!geminiApiKey : !!apiKey;
   const [showApiModal, setShowApiModal] = useState(!apiKey && !geminiApiKey);
+  const [showPersonaModal, setShowPersonaModal] = useState(false);
 
   const [viewMode, setViewMode] = useState<ViewMode>('split');
   const [splitPercent, setSplitPercent] = useState(40);
@@ -235,7 +247,7 @@ function CanvasView() {
           boxShadow: '0 1px 24px var(--shadow-topbar)',
         }}
       >
-        {/* Left: logo */}
+        {/* Left: logo + persona button */}
         <div className="flex items-center gap-2.5">
           <button onClick={closeProject} className="flex items-center gap-2 group" title="Back to Home">
             <img
@@ -249,6 +261,34 @@ function CanvasView() {
             >
               Radial AI
             </span>
+          </button>
+
+          {/* Persona trigger */}
+          <button
+            onClick={() => setShowPersonaModal(true)}
+            title={systemPrompt ? `Persona: ${personaName || 'Custom'}` : 'Set AI Persona'}
+            className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs transition-all"
+            style={systemPrompt ? {
+              background: 'linear-gradient(135deg,rgba(244,114,182,0.15),rgba(96,165,250,0.15))',
+              border: '1px solid rgba(244,114,182,0.4)',
+              color: '#f472b6',
+            } : {
+              background: 'var(--bg-subtle)',
+              border: '1px solid var(--border-base)',
+              color: 'var(--text-faint)',
+            }}
+          >
+            <span>🤖</span>
+            {systemPrompt
+              ? <span className="hidden sm:inline font-medium">{personaName || 'Persona'}</span>
+              : <span className="hidden sm:inline">Persona</span>
+            }
+            {systemPrompt && (
+              <span
+                className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                style={{ background: '#f472b6' }}
+              />
+            )}
           </button>
         </div>
 
@@ -320,9 +360,11 @@ function CanvasView() {
               onEdgesChange={onEdgesChange}
               onConnect={onConnect}
               nodeTypes={nodeTypes}
+              edgeTypes={edgeTypes}
               onNodeClick={handleNodeClick}
               onPaneClick={handlePaneClick}
               nodesDraggable={true}
+              multiSelectionKeyCode="Shift"
               fitView
               fitViewOptions={{ padding: 0.3 }}
               minZoom={0.2}
@@ -390,6 +432,7 @@ function CanvasView() {
       <GlobalInputPalette />
 
       {showApiModal && <ApiKeyModal onClose={() => setShowApiModal(false)} />}
+      {showPersonaModal && <PersonaModal onClose={() => setShowPersonaModal(false)} />}
       <UsageBar />
     </div>
   );

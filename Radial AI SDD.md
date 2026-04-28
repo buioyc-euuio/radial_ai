@@ -147,3 +147,29 @@ const newAncestorIds = [...parentNode.data.ancestorIds, parentNode.id];
 配合 React Flow 的 `nodes` 陣列，只要在每一個 node 的 `data` 屬性裡塞入 `ancestor_ids`，邏輯會變得異常乾淨。
 
 未來擴張到 Firebase / Supabase 時，這個結構完全不需要改寫，直接無痛上雲。
+
+5. 未來發展藍圖 (Future Roadmap & Sprints)
+註：以下不在 MVP 範圍內，將於後續 Sprint 逐步迭代。
+5.1 Global Input Palette 進階 UI/UX
+快捷鍵操作: 支援 Enter 送出，Shift + Enter 換行。
+附件上傳 (+ 按鈕): 支援點擊 + 號上傳，或 Drag & Drop 檔案至對話框。
+模型切換器 (Model Switcher): 輸入框提供下拉選單，無縫切換不同模型。
+進階擴充功能: Deep Research 網路搜尋、特定 Artifacts/文件檔案級別的 Context 整合。
+5.2 進階上下文歷史控制 (Advanced Context Scope Control)
+於輸入框功能列新增「歷史範圍選取器」，發送前決定打包多少歷史：
+直系血親 (Ancestral Tracing - 預設): 僅傳送當前路徑歷史。
+所有節點 (Global History): 傳送畫布上所有節點（包含所有分支），適用於綜合歸納。
+自定義節點 (Custom Selection): 觸發畫布選取模式，手動框選特定歷史節點作為 Context
+透過 google api key 寫程式，我能控制history 傳入的東西嗎？可以！太棒了
+你的產品是「放射狀」的，這意味著你可以發展出很多精妙的策略：
+直系血親路徑 (Ancestry Path)： 當使用者點擊某個節點進行提問時，你的程式碼自動往回找它的「父親節點」、「祖父節點」，直到根節點。只把這條「垂直線」上的內容當作 history 傳給 AI。這樣即便畫布有 100 個節點，AI 也只會聚焦在相關的脈絡上。
+手動勾選 (Manual Selection)： 你可以做一個功能，讓使用者在畫布上按住 Shift 點選特定三個節點，然後按「針對這些節點提問」。這時候你的程式碼就只抓這三個節點的 text 組成 contents。
+語義相似度過濾 (RAG)： 如果你之後用到 Gemini Embedding 1（就是你之前問的那個），你可以把使用者的最新問題拿去跟畫布上所有節點比對，只找出「最相關」的三個節點餵給 AI。
+這樣做的好處：
+節省 Token： 你不用每次都傳幾百個節點過去。
+更精準的回覆： 減少無關資訊（雜訊）干擾 AI 的判斷。
+打破線性限制： 使用者可以在同一個畫布上，同時進行多條互不干擾的對話路徑，因為每一條路徑傳給 API 的 history 都是你動態生成的。
+這就是開發 API 產品最迷人的地方——你就是 AI 的記憶管理員，你可以決定它記得什麼，忘記什麼。
+
+
+

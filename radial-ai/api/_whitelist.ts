@@ -8,6 +8,9 @@ export const HARDCODED_WHITELIST: string[] = [
   // 'tester@gmail.com',
   // 'friend@example.com',
   'buioyc1129euuio@gmail.com',
+  'jacklin3458@gmail.com',
+  'amos950402@gmail.com',
+  'helen10108233@gmail.com',
 ];
 
 // ── Shared helpers ────────────────────────────────────────────────────────────

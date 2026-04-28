@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { GoogleLogin, type CredentialResponse } from '@react-oauth/google';
 import { useCanvasStore } from '../store/canvasStore';
 import { useAuthStore, type GoogleUser } from '../store/authStore';
@@ -30,8 +30,6 @@ async function checkWhitelist(credential: string): Promise<boolean> {
 }
 
 function GoogleLoginBtn({ onLogin }: { onLogin: (u: GoogleUser, credential: string) => void }) {
-  const btnRef = useRef<HTMLDivElement>(null);
-
   const handleCredential = (credentialResponse: CredentialResponse) => {
     if (!credentialResponse.credential) return;
     const payload = decodeJwt(credentialResponse.credential);
@@ -39,16 +37,20 @@ function GoogleLoginBtn({ onLogin }: { onLogin: (u: GoogleUser, credential: stri
   };
 
   return (
-    <div className="relative flex items-center">
-      {/* Visible custom button — click triggers the hidden GoogleLogin button */}
-      <button
-        onClick={() => btnRef.current?.querySelector<HTMLElement>('[role=button]')?.click()}
-        className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all"
+    // Overlay pattern: the invisible Google button sits on top and receives
+    // real user clicks directly — no programmatic click simulation needed.
+    <div style={{ position: 'relative', display: 'inline-flex', cursor: 'pointer' }}>
+      {/* Visual layer — non-interactive, purely decorative */}
+      <div
+        className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold"
         style={{
           background: 'linear-gradient(135deg,#fff,#f1f5f9)',
           color: '#374151',
           border: '1px solid #d1d5db',
           boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
+          pointerEvents: 'none',
+          userSelect: 'none',
+          whiteSpace: 'nowrap',
         }}
       >
         <svg width="14" height="14" viewBox="0 0 48 48">
@@ -58,9 +60,9 @@ function GoogleLoginBtn({ onLogin }: { onLogin: (u: GoogleUser, credential: stri
           <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
         </svg>
         登入
-      </button>
-      {/* Hidden GoogleLogin renders the real button that handles the OAuth flow */}
-      <div ref={btnRef} style={{ position: 'absolute', opacity: 0, pointerEvents: 'none', width: 1, height: 1, overflow: 'hidden' }}>
+      </div>
+      {/* Invisible Google button covers the full area — receives real clicks */}
+      <div style={{ position: 'absolute', inset: 0, opacity: 0, overflow: 'hidden' }}>
         <GoogleLogin onSuccess={handleCredential} onError={() => {}} useOneTap={false} />
       </div>
     </div>

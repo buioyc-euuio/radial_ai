@@ -19,12 +19,8 @@ function ThoughtNode({ id, data }: NodeProps) {
   const displayText = nodeData.title
     ?? (nodeData.prompt.length > 55 ? nodeData.prompt.slice(0, 55) + '…' : nodeData.prompt);
 
-  const handleStyle = {
-    background: 'linear-gradient(135deg,#f472b6,#60a5fa)',
-    border: '2px solid white',
-    width: 10,
-    height: 10,
-  };
+  // Handles are invisible — FloatingEdge computes its own border-point endpoints
+  const handleStyle = { opacity: 0, width: 8, height: 8 };
 
   return (
     <div

@@ -49,56 +49,79 @@ const idbStorage = {
 const TUTORIAL_PROJECT_ID = 'tutorial';
 
 const TUTORIAL_NODES: Node<NodeData>[] = [
+  // ── Node 1: Root / Overview ────────────────────────────────────────────────
   {
     id: 'tutorial-1', type: 'thoughtNode',
     position: { x: 80, y: 80 },
     data: {
       type: 'thoughtNode',
-      prompt: '什麼是 Radial AI？',
-      response: `Radial AI 是一個將 AI 對話以**樹狀圖**呈現的無限畫布工具。\n\n不同於傳統的線性聊天，Radial AI 讓你能夠：\n\n- **分支**：從任何節點延伸出新的對話分支\n- **引用**：選取文字並引用為脈絡膠囊，讓 AI 理解你的意圖\n- **視覺化**：在畫布上看見你的思維地圖\n\n**左側畫布** 展示節點結構，**右側閱讀面板** 提供完整的閱讀與互動體驗。\n\n👉 點擊其他節點繼續探索！`,
-      title: 'Radial AI 入門指南',
+      prompt: '什麼是 Radial AI v2？',
+      response: `Radial AI 是一款打破傳統線性對話的 **AI 思維畫布**。\n\n## 核心概念\n\n左側**無限畫布**將每一次 AI 問答化為可視化的「思維節點」，右側**閱讀面板**提供深度閱讀與互動。所有節點以**有向箭頭**連接，清楚呈現思路的脈絡與分支。\n\n## v2 全新升級\n\n- **🔀 DAG 多父節點匯聚**：Shift+Click 選取多個節點，讓新節點從多個來源同時繼承脈絡\n- **🎯 Context Scope 切換器**：輸入框下方切換「血親 / 全局 / 自定義」三種歷史打包模式\n- **🤖 AI Persona**：為每個畫布設定獨立的系統指令，打造專屬 AI 角色\n- **✨ Floating Edges**：邊線動態連接節點最近邊框，拖曳後自動重路由\n\n## 本畫布本身就是示範！\n\n你現在看到的節點佈局示範了 DAG 結構 — **節點 #5 同時從 #2 與 #3 匯聚**。\n\n👉 點擊其他節點繼續探索，或切換到右側閱讀面板閱讀完整內容。`,
+      title: 'Radial AI v2 — 產品概覽',
       isLoading: false, isCollapsed: false,
     },
   },
+  // ── Node 2: Main timeline ──────────────────────────────────────────────────
   {
     id: 'tutorial-2', type: 'thoughtNode',
-    position: { x: 80, y: 300 },
+    position: { x: 80, y: 360 },
     data: {
       type: 'thoughtNode',
-      prompt: '如何建立新的思考節點？',
-      response: `## 建立節點\n\n在畫面底部的**輸入框**輸入你的問題，按下 **Enter** 發送。\n\n### 兩種新增模式\n\n**1. 主時間線（無引用）**\n輸入框沒有任何引用膠囊時，新節點自動加入**垂直時間線**（左側縱向排列）。\n\n**2. 分支（有引用）**\n先從閱讀面板引用文字，新節點會以**分支**出現在被引用節點的右側，並以箭頭連接。若同時引用多個節點，每個被引用節點都會各自拉一條箭頭指向新節點。\n\n💡 **快速鍵**：按 **⌘/** 聚焦到輸入框`,
-      title: '建立思考節點的方法',
+      prompt: '如何建立節點？主時間線怎麼運作？',
+      response: `## 主時間線（Main Timeline）\n\n在底部輸入框輸入問題，按 **Enter** 發送。\n\n**沒有任何引用膠囊時** → 新節點自動加入**左側垂直時間線**，向下堆疊。\n\n---\n\n## 建立分支\n\n**有引用膠囊時** → 新節點出現在被引用節點的右側，以箭頭連接。\n\n### 如何引用？\n\n1. 點擊畫布節點 → 右側顯示完整內容\n2. 在右側選取文字\n3. 按 **⌘K**（或點工具列「引用」）\n4. 文字化為輸入框上方的**脈絡膠囊**\n5. 輸入問題 → Enter → 生成分支節點\n\n---\n\n## 快速鍵\n\n| 鍵 | 功能 |\n|----|------|\n| **Enter** | 發送訊息 |\n| **Shift+Enter** | 輸入框換行 |\n| **⌘/** | 聚焦輸入框 |\n| **Option+點擊節點** | 整個節點加入引用 |`,
+      title: '主時間線與分支建立',
       isLoading: false, isCollapsed: false,
     },
   },
+  // ── Node 3: Referencing & branching ───────────────────────────────────────
   {
     id: 'tutorial-3', type: 'thoughtNode',
     position: { x: 380, y: 80 },
     data: {
       type: 'thoughtNode',
-      prompt: '如何引用其他節點的內容？',
-      response: `## 引用功能\n\n1. 點擊左側畫布中的節點 → 右側顯示完整內容\n2. 在右側**選取文字**\n3. 浮動工具列出現 → 點擊 **引用**（或按 **⌘K**）\n4. 選取的文字以**脈絡膠囊**形式出現在輸入框上方\n5. 輸入問題按 Enter → AI 根據引用脈絡回答\n\n### 多重引用\n你可以同時引用**多個節點**的內容！每個被引用的節點都會以**獨立的箭頭**連接到新節點，讓引用關係清晰可見。\n\n### 全節點引用\n按住 **Alt/Shift** 點擊節點，可以將整個節點加入為引用。`,
-      title: '引用與脈絡膠囊功能',
+      prompt: '引用與脈絡膠囊怎麼用？',
+      response: `## 脈絡膠囊（Context Capsule）\n\n膠囊是你傳給 AI 的「精準注意力錨點」。你選取的段落會以結構化方式組裝進最後一則 user message，確保 AI 聚焦在你關心的部分。\n\n---\n\n## 三種加入方式\n\n**1. 精準引用（文字片段）**\n- 在閱讀面板選取文字 → 按 **⌘K / L / C**\n- 最常用、最省 Token\n\n**2. 全節點引用**\n- 在畫布上 **Option（Alt）+ 點擊**節點\n- 整個節點的 Prompt + Response 都加入\n\n**3. Shift+Click 多選（v2 新功能）**\n- 在畫布上 **Shift+點擊 2 個以上**節點\n- 這些節點成為新節點的**多個父節點**（DAG 匯聚）\n- 系統自動追溯所有父節點的祖先歷史並去重合併\n\n---\n\n## 多重引用\n\n可以同時引用**不同節點的不同段落**。每個被引用節點都會以獨立箭頭指向新節點，引用關係清晰可見。`,
+      title: '引用、膠囊與多父節點',
       isLoading: false, isCollapsed: false,
     },
   },
+  // ── Node 4: Reading panel shortcuts ───────────────────────────────────────
   {
     id: 'tutorial-4', type: 'thoughtNode',
     position: { x: 680, y: 80 },
     data: {
       type: 'thoughtNode',
-      prompt: '閱讀面板有哪些互動功能？',
-      response: `## 閱讀面板互動功能\n\n右側閱讀面板是你與內容互動的主要區域：\n\n### 文字操作（選取文字後）\n\n| 快速鍵 | 功能 |\n|--------|------|\n| **⌘K / L / C** | 引用到脈絡膠囊 |\n| **H / F** | 螢光筆（藍色標記） |\n| **N / A / E** | 建立側邊筆記 |\n\n### 全域快速鍵\n- **⌘/** → 聚焦輸入框\n- **Alt / Option+點擊節點** → 全節點引用\n\n### 筆記功能\n選取文字後建立筆記，可以在筆記中繼續與 AI 對話，追蹤特定段落的想法。`,
-      title: '閱讀面板的互動功能',
+      prompt: '閱讀面板有哪些功能？',
+      response: `## 閱讀面板（Reading Panel）\n\n右側面板是深度互動的主要區域。點擊畫布任意節點，完整內容在此展開。\n\n---\n\n## 選取文字後的浮動工具列\n\n| 快速鍵 | 功能 |\n|--------|------|\n| **⌘K / L / C** | 引用為脈絡膠囊 |\n| **H / F** | 螢光筆標記 |\n| **N / A / E** | 建立側邊筆記 |\n\n---\n\n## 側邊筆記（Annotation）\n\n選取段落後按 **N**，在右側建立筆記卡。筆記中可以繼續和 AI 對話，追蹤特定段落的想法而不污染主對話。\n\n---\n\n## 版面切換\n\n右上角三個按鈕切換：\n- 🖼 **畫布全螢幕**\n- ⬛ **左右分割（預設）**\n- 📄 **閱讀面板全螢幕**\n\n---\n\n## 其他快速鍵\n\n| 鍵 | 功能 |\n|----|------|\n| **⌘/** | 聚焦輸入框 |\n| 滑鼠側鍵 X1/X2 | 節點歷史前進/後退 |`,
+      title: '閱讀面板快速鍵全覽',
+      isLoading: false, isCollapsed: false,
+    },
+  },
+  // ── Node 5: v2 features (DAG convergence — has 2 parents: nodes 2 & 3) ────
+  {
+    id: 'tutorial-5', type: 'thoughtNode',
+    position: { x: 380, y: 360 },
+    data: {
+      type: 'thoughtNode',
+      prompt: 'v2 三大新功能怎麼用？（此節點示範 DAG 匯聚：同時從節點 #2 和 #3 繼承）',
+      response: `## 🔀 DAG 多父節點匯聚\n\n**你現在看到的這個節點本身就是示範** — 它同時有兩個父節點（#2 和 #3），兩條箭頭都指向這裡。\n\n### 如何觸發？\n\n在畫布上 **Shift+Click 2 個以上**節點，然後在輸入框發送問題。系統會：\n1. 為每個父節點各自拉一條箭頭\n2. 自動追溯所有父節點的祖先歷史\n3. 去重合併後按時間順序排列，再送給 AI\n\n---\n\n## 🎯 Context Scope 切換器\n\n輸入框上方有三個模式按鈕：\n\n| 模式 | 說明 | 適合場景 |\n|------|------|----------|\n| 🔗 **血親路徑**（預設）| 只追溯直系祖先 | 一般對話，省 Token |\n| 🌐 **所有節點** | 畫布全部節點 | 跨分支綜合歸納 |\n| 👆 **自定義** | Shift+Click 選取的節點本身（不追祖先）| 精準指定脈絡 |\n\n---\n\n## 🤖 AI Persona\n\n點擊**左上角 🤖 Persona 按鈕**，為這個畫布設定：\n- **角色名稱**（e.g. 蘇格拉底、程式審查員）\n- **系統指令**（繁體中文回答、特定角色扮演、輸出格式要求…）\n\nPersona 存在畫布內，每個畫布可以有不同的 AI 角色。有設定時按鈕會發光提醒你。`,
+      title: 'v2 新功能：DAG 匯聚 · Scope · Persona',
       isLoading: false, isCollapsed: false,
     },
   },
 ];
 
 const TUTORIAL_EDGES: Edge[] = [
-  { id: 'e-tutorial-1-2', source: 'tutorial-1', target: 'tutorial-2', sourceHandle: 'source-bottom', targetHandle: 'target-top', type: 'smoothstep', markerEnd: { type: 'arrowclosed' as const }, style: { stroke: '#f472b6' } },
-  { id: 'e-tutorial-1-3', source: 'tutorial-1', target: 'tutorial-3', sourceHandle: 'source-right', targetHandle: 'target-left', type: 'smoothstep', markerEnd: { type: 'arrowclosed' as const }, style: { stroke: '#f472b6' } },
-  { id: 'e-tutorial-3-4', source: 'tutorial-3', target: 'tutorial-4', sourceHandle: 'source-right', targetHandle: 'target-left', type: 'smoothstep', markerEnd: { type: 'arrowclosed' as const }, style: { stroke: '#f472b6' } },
+  // Main timeline: 1 → 2
+  { id: 'e-t1-t2', source: 'tutorial-1', target: 'tutorial-2', sourceHandle: 'source-bottom', targetHandle: 'target-top', type: 'floatingEdge', markerEnd: { type: 'arrowclosed' as const }, style: { stroke: '#f472b6' } },
+  // Branch: 1 → 3
+  { id: 'e-t1-t3', source: 'tutorial-1', target: 'tutorial-3', sourceHandle: 'source-right', targetHandle: 'target-left', type: 'floatingEdge', markerEnd: { type: 'arrowclosed' as const }, style: { stroke: '#f472b6' } },
+  // Branch: 3 → 4
+  { id: 'e-t3-t4', source: 'tutorial-3', target: 'tutorial-4', sourceHandle: 'source-right', targetHandle: 'target-left', type: 'floatingEdge', markerEnd: { type: 'arrowclosed' as const }, style: { stroke: '#f472b6' } },
+  // DAG convergence: 2 → 5 (demonstrates multi-parent)
+  { id: 'e-t2-t5', source: 'tutorial-2', target: 'tutorial-5', sourceHandle: 'source-right', targetHandle: 'target-left', type: 'floatingEdge', markerEnd: { type: 'arrowclosed' as const }, style: { stroke: '#a78bfa' } },
+  // DAG convergence: 3 → 5 (second parent)
+  { id: 'e-t3-t5', source: 'tutorial-3', target: 'tutorial-5', sourceHandle: 'source-bottom', targetHandle: 'target-top', type: 'floatingEdge', markerEnd: { type: 'arrowclosed' as const }, style: { stroke: '#a78bfa' } },
 ];
 
 function createTutorialProject(): Project {
@@ -146,6 +169,8 @@ export interface Project {
   updatedAt: number;
   nodes: Node<NodeData>[];
   edges: Edge[];
+  systemPrompt?: string;
+  personaName?: string;
 }
 
 // ── Node navigation history (module-level, not persisted) ────────────────────
@@ -177,6 +202,16 @@ interface CanvasStore {
   edges: Edge[];
   contextCapsules: ContextCapsule[];
   selectedNodeId: string | null;
+
+  // Per-canvas AI persona
+  systemPrompt: string;
+  personaName: string;
+  setSystemPrompt: (prompt: string) => void;
+  setPersonaName: (name: string) => void;
+
+  // Context scope (not persisted — resets to 'ancestry' each session)
+  historyScope: 'ancestry' | 'global' | 'custom';
+  setHistoryScope: (scope: 'ancestry' | 'global' | 'custom') => void;
 
   // Global settings
   apiKey: string;
@@ -245,6 +280,8 @@ function syncProject(
 }
 
 // ── Ancestral path helpers ───────────────────────────────────────────────────
+
+/** Legacy single-path traversal (kept for regenerateNode fallback). */
 export function getAncestralPath(nodeId: string, nodes: Node<NodeData>[], edges: Edge[]): Node<NodeData>[] {
   const path: Node<NodeData>[] = [];
   let currentId = nodeId;
@@ -254,6 +291,46 @@ export function getAncestralPath(nodeId: string, nodes: Node<NodeData>[], edges:
     currentId = edges.find(e => e.target === currentId)?.source ?? '';
   }
   return path;
+}
+
+/**
+ * DAG-aware ancestor collector. Starting from any number of parent node IDs,
+ * walks backwards through directed thought-node edges, deduplicates, and
+ * returns the result sorted chronologically (top-to-bottom, left-to-right).
+ * The parent nodes themselves are included in the result.
+ */
+export function getDAGAncestors(
+  parentIds: string[],
+  nodes: Node<NodeData>[],
+  edges: Edge[],
+): Node<NodeData>[] {
+  const visited = new Set<string>();
+  const result: Node<NodeData>[] = [];
+  const queue = [...parentIds];
+
+  while (queue.length > 0) {
+    const id = queue.shift()!;
+    if (visited.has(id)) continue;
+    visited.add(id);
+
+    const node = nodes.find(n => n.id === id);
+    if (node && node.data.type === 'thoughtNode') result.push(node);
+
+    // Walk backwards: follow only edges between thought nodes
+    for (const edge of edges) {
+      if (edge.target !== id) continue;
+      const parentNode = nodes.find(n => n.id === edge.source);
+      if (parentNode && parentNode.data.type === 'thoughtNode' && !visited.has(edge.source)) {
+        queue.push(edge.source);
+      }
+    }
+  }
+
+  // Sort chronologically by canvas position (top → bottom, then left → right)
+  return result.sort((a, b) => {
+    const dy = a.position.y - b.position.y;
+    return Math.abs(dy) > 5 ? dy : a.position.x - b.position.x;
+  });
 }
 
 export function buildMessagesFromPath(path: Node<NodeData>[]): { role: 'user' | 'assistant'; content: string }[] {
@@ -334,16 +411,22 @@ async function callGeminiAPI(
 
 async function callAI(
   model: string, anthropicKey: string, geminiKey: string,
-  messages: { role: 'user' | 'assistant'; content: string }[]
+  messages: { role: 'user' | 'assistant'; content: string }[],
+  canvasSystemPrompt?: string,
 ): Promise<string> {
   const { devMode, credential, isWhitelisted } = useAuthStore.getState();
+
+  // Merge canvas persona prompt with the title-extraction instruction
+  const systemPrompt = canvasSystemPrompt
+    ? `${canvasSystemPrompt}\n\n${TITLE_SYSTEM_PROMPT}`
+    : TITLE_SYSTEM_PROMPT;
 
   // Dev mode: route through backend proxy (uses server PROD_API_KEY, model locked server-side)
   if (devMode && isWhitelisted && credential) {
     const res = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ credential, messages, system: TITLE_SYSTEM_PROMPT }),
+      body: JSON.stringify({ credential, messages, system: systemPrompt }),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
@@ -356,10 +439,10 @@ async function callAI(
   // BYOK: direct browser-to-API calls
   if (getModelProvider(model) === 'google') {
     if (!geminiKey) throw new Error('Please set your Google Gemini API key in Settings.');
-    return callGeminiAPI(geminiKey, model, messages, TITLE_SYSTEM_PROMPT);
+    return callGeminiAPI(geminiKey, model, messages, systemPrompt);
   }
   if (!anthropicKey) throw new Error('Please set your Anthropic API key in Settings.');
-  return callClaudeAPI(anthropicKey, model, messages, TITLE_SYSTEM_PROMPT);
+  return callClaudeAPI(anthropicKey, model, messages, systemPrompt);
 }
 
 // ── Store ────────────────────────────────────────────────────────────────────
@@ -376,6 +459,9 @@ export const useCanvasStore = create<CanvasStore>()(
       edges: [],
       contextCapsules: [],
       selectedNodeId: null,
+      systemPrompt: '',
+      personaName: '',
+      historyScope: 'ancestry',
 
       // Settings
       apiKey: '',
@@ -412,6 +498,8 @@ export const useCanvasStore = create<CanvasStore>()(
           edges: project.edges,
           contextCapsules: [],
           selectedNodeId: firstNode?.id ?? null,
+          systemPrompt: project.systemPrompt ?? '',
+          personaName: project.personaName ?? '',
         };
       }),
 
@@ -423,6 +511,8 @@ export const useCanvasStore = create<CanvasStore>()(
           edges: [],
           contextCapsules: [],
           selectedNodeId: null,
+          systemPrompt: '',
+          personaName: '',
         });
       },
 
@@ -440,6 +530,24 @@ export const useCanvasStore = create<CanvasStore>()(
       setGeminiApiKey: (key) => set({ geminiApiKey: key }),
       setModel: (model) => set({ model }),
       toggleTheme: () => set((state) => ({ theme: state.theme === 'light' ? 'dark' : 'light' })),
+
+      setSystemPrompt: (prompt) => set((state) => {
+        if (!state.currentProjectId) return { systemPrompt: prompt };
+        const projects = state.projects.map(p =>
+          p.id === state.currentProjectId ? { ...p, systemPrompt: prompt, updatedAt: Date.now() } : p
+        );
+        return { systemPrompt: prompt, projects };
+      }),
+
+      setPersonaName: (name) => set((state) => {
+        if (!state.currentProjectId) return { personaName: name };
+        const projects = state.projects.map(p =>
+          p.id === state.currentProjectId ? { ...p, personaName: name, updatedAt: Date.now() } : p
+        );
+        return { personaName: name, projects };
+      }),
+
+      setHistoryScope: (scope) => set({ historyScope: scope }),
 
       // ── Canvas actions (with project sync) ──────────────────────────────
       onNodesChange: (changes) => set((state) => {
@@ -545,110 +653,175 @@ export const useCanvasStore = create<CanvasStore>()(
       },
 
       sendPrompt: async (userInput: string) => {
-        const { nodes, edges, contextCapsules, apiKey, geminiApiKey, model } = get();
+        const { nodes, edges, contextCapsules, apiKey, geminiApiKey, model, systemPrompt, historyScope } = get();
 
-        // Unique source node IDs from all context capsules (deduped)
-        const referenceSourceIds = [...new Set(contextCapsules.map(c => c.sourceNodeId))].filter(Boolean);
-        const primarySourceNodeId = referenceSourceIds[0] ?? null;
+        // ── Determine parent node IDs ────────────────────────────────────────
+        // Multi-select (Shift+Click 2+ nodes) takes priority over capsule sources.
+        const selectedThoughtNodes = nodes.filter(
+          n => n.selected && n.data.type === 'thoughtNode'
+        );
+        const capsuleSourceIds = [...new Set(contextCapsules.map(c => c.sourceNodeId))].filter(Boolean);
+
+        let parentIds: string[];
+        if (selectedThoughtNodes.length >= 2) {
+          // DAG convergence: merge all selected nodes + any capsule sources
+          parentIds = [...new Set([...selectedThoughtNodes.map(n => n.id), ...capsuleSourceIds])];
+        } else if (capsuleSourceIds.length > 0) {
+          // Classic branch: capsule source nodes determine parenthood
+          parentIds = capsuleSourceIds;
+        } else {
+          parentIds = [];
+        }
 
         const newNodeId = uuidv4();
         let newPosition = { x: MAIN_TIMELINE_X, y: 80 };
         const parentEdges: Edge[] = [];
 
-        if (primarySourceNodeId) {
-          const sourceNode = nodes.find(n => n.id === primarySourceNodeId);
-          if (sourceNode) {
-            const branchX = sourceNode.position.x + NODE_WIDTH + BRANCH_HORIZONTAL_GAP;
-            const childIds = edges.filter(e => e.source === primarySourceNodeId).map(e => e.target);
+        if (parentIds.length > 0) {
+          const parentNodes = parentIds
+            .map(id => nodes.find(n => n.id === id))
+            .filter((n): n is Node<NodeData> => !!n);
+
+          if (parentIds.length === 1) {
+            // Single parent → classic right-side branch
+            const srcNode = parentNodes[0];
+            const branchX = srcNode.position.x + NODE_WIDTH + BRANCH_HORIZONTAL_GAP;
+            const childIds = edges.filter(e => e.source === srcNode.id).map(e => e.target);
             const children = nodes.filter(n => childIds.includes(n.id));
             if (children.length === 0) {
-              newPosition = { x: branchX, y: sourceNode.position.y };
+              newPosition = { x: branchX, y: srcNode.position.y };
             } else {
               const lowest = [...children].sort((a, b) => b.position.y - a.position.y)[0];
               newPosition = { x: branchX, y: lowest.position.y + NODE_HEIGHT_ESTIMATE + NODE_VERTICAL_GAP };
             }
+          } else {
+            // Multiple parents → position below-center of the group
+            const maxY = Math.max(...parentNodes.map(n => n.position.y));
+            const avgX = parentNodes.reduce((s, n) => s + n.position.x + NODE_WIDTH / 2, 0) / parentNodes.length;
+            newPosition = {
+              x: avgX - NODE_WIDTH / 2,
+              y: maxY + NODE_HEIGHT_ESTIMATE + NODE_VERTICAL_GAP,
+            };
           }
-          // One edge per unique reference source
-          for (const sourceId of referenceSourceIds) {
-            const srcNode = nodes.find(n => n.id === sourceId);
+
+          // One floating edge per parent
+          for (const parentId of parentIds) {
+            const srcNode = nodes.find(n => n.id === parentId);
             if (!srcNode) continue;
-            const { sourceHandle, targetHandle } = getEdgeHandles(srcNode.position.x, srcNode.position.y, newPosition.x, newPosition.y);
-            parentEdges.push({ id: `e_${sourceId}_${newNodeId}`, source: sourceId, target: newNodeId, sourceHandle, targetHandle, type: 'smoothstep', markerEnd: { type: 'arrowclosed' as const }, style: { stroke: '#f472b6' } });
+            const { sourceHandle, targetHandle } = getEdgeHandles(
+              srcNode.position.x, srcNode.position.y, newPosition.x, newPosition.y
+            );
+            parentEdges.push({
+              id: `e_${parentId}_${newNodeId}`,
+              source: parentId, target: newNodeId,
+              sourceHandle, targetHandle,
+              type: 'floatingEdge',
+              markerEnd: { type: 'arrowclosed' as const },
+              style: { stroke: '#f472b6' },
+            });
           }
         } else {
-          // No references: append to main vertical timeline
+          // No parents → append on main vertical timeline
           const lastMainNode = getMainTimelineLastNode(nodes, edges);
           if (lastMainNode) {
-            newPosition = { x: lastMainNode.position.x, y: lastMainNode.position.y + NODE_HEIGHT_ESTIMATE + NODE_VERTICAL_GAP };
-            parentEdges.push({ id: `e_${lastMainNode.id}_${newNodeId}`, source: lastMainNode.id, target: newNodeId, sourceHandle: 'source-bottom', targetHandle: 'target-top', type: 'smoothstep', markerEnd: { type: 'arrowclosed' as const }, style: { stroke: '#f472b6' } });
+            newPosition = {
+              x: lastMainNode.position.x,
+              y: lastMainNode.position.y + NODE_HEIGHT_ESTIMATE + NODE_VERTICAL_GAP,
+            };
+            parentEdges.push({
+              id: `e_${lastMainNode.id}_${newNodeId}`,
+              source: lastMainNode.id, target: newNodeId,
+              sourceHandle: 'source-bottom', targetHandle: 'target-top',
+              type: 'floatingEdge',
+              markerEnd: { type: 'arrowclosed' as const },
+              style: { stroke: '#f472b6' },
+            });
           }
         }
 
-        // Compute ancestorIds (primary lineage only)
-        let newAncestorIds: string[] = [];
-        if (primarySourceNodeId) {
-          const sourceNode = nodes.find(n => n.id === primarySourceNodeId);
-          if (sourceNode && sourceNode.data.type === 'thoughtNode') {
-            const sourceData = sourceNode.data as ThoughtNodeData;
-            newAncestorIds = [...(sourceData.ancestorIds ?? []), primarySourceNodeId];
-          } else {
-            newAncestorIds = [primarySourceNodeId];
-          }
-        } else {
-          const lastMainNode = getMainTimelineLastNode(nodes, edges);
-          if (lastMainNode) {
-            if (lastMainNode.data.type === 'thoughtNode') {
-              const lastData = lastMainNode.data as ThoughtNodeData;
-              newAncestorIds = [...(lastData.ancestorIds ?? []), lastMainNode.id];
-            } else {
-              newAncestorIds = [lastMainNode.id];
-            }
-          }
-        }
+        // ── Build deduplicated DAG conversation history ───────────────────────
+        const effectiveParentIds = parentIds.length > 0
+          ? parentIds
+          : parentEdges.length > 0 ? [parentEdges[0].source] : [];
+
+        const ancestors = effectiveParentIds.length > 0
+          ? getDAGAncestors(effectiveParentIds, nodes, edges)
+          : [];
 
         const newNode: Node<ThoughtNodeData> = {
           id: newNodeId, type: 'thoughtNode', position: newPosition,
           data: {
             type: 'thoughtNode', prompt: userInput, response: '', isLoading: true, isCollapsed: false,
-            ancestorIds: newAncestorIds,
+            ancestorIds: ancestors.map(n => n.id),
             references: contextCapsules.length > 0 ? [...contextCapsules] : undefined,
           },
         };
 
         set((state) => {
-          const newNodes = [...state.nodes, newNode as Node<NodeData>];
+          // Deselect all nodes so multi-select doesn't persist to the next prompt
+          const newNodes = [...state.nodes.map(n => ({ ...n, selected: false })), newNode as Node<NodeData>];
           const newEdges = parentEdges.length > 0 ? [...state.edges, ...parentEdges] : state.edges;
-          return { nodes: newNodes, edges: newEdges, contextCapsules: [], selectedNodeId: newNodeId, ...syncProject(state.projects, state.currentProjectId, newNodes, newEdges) };
+          return {
+            nodes: newNodes, edges: newEdges,
+            contextCapsules: [], selectedNodeId: newNodeId,
+            ...syncProject(state.projects, state.currentProjectId, newNodes, newEdges),
+          };
         });
 
-        const ancestralPath = primarySourceNodeId
-          ? getAncestralPath(primarySourceNodeId, get().nodes, get().edges)
-          : getAncestralPath(newNodeId, get().nodes, get().edges).slice(0, -1);
-
+        // ── Augment prompt with context capsules ─────────────────────────────
         let finalUserContent = userInput;
         if (contextCapsules.length > 0) {
-          const contextParts = contextCapsules.map((c, i) => `【Context ${i + 1} (from: ${c.sourceNodeLabel})】:\n"${c.text}"`).join('\n\n');
+          const contextParts = contextCapsules
+            .map((c, i) => `【Context ${i + 1} (from: ${c.sourceNodeLabel})】:\n"${c.text}"`)
+            .join('\n\n');
           finalUserContent = `${contextParts}\n\n【User Question】:\n${userInput}\n\nPlease answer based on the above references and our conversation history.`;
         }
 
-        const messages = [...buildMessagesFromPath(ancestralPath), { role: 'user' as const, content: finalUserContent }];
+        // ── Build message history based on selected scope ─────────────────────
+        const chronoSort = (a: Node<NodeData>, b: Node<NodeData>) => {
+          const dy = a.position.y - b.position.y;
+          return Math.abs(dy) > 5 ? dy : a.position.x - b.position.x;
+        };
+
+        let historyNodes: Node<NodeData>[];
+        if (historyScope === 'global') {
+          // All thought nodes on canvas, sorted chronologically top→bottom, left→right
+          historyNodes = nodes.filter(n => n.data.type === 'thoughtNode').sort(chronoSort);
+        } else if (historyScope === 'custom') {
+          // Only the manually Shift+Click selected nodes — no ancestor tracing
+          historyNodes = nodes
+            .filter(n => n.selected && n.data.type === 'thoughtNode')
+            .sort(chronoSort);
+        } else {
+          // 'ancestry' (default): DAG ancestors from parent nodes
+          historyNodes = ancestors;
+        }
+
+        const messages = [
+          ...buildMessagesFromPath(historyNodes),
+          { role: 'user' as const, content: finalUserContent },
+        ];
 
         try {
-          const rawResponse = await callAI(model, apiKey, geminiApiKey, messages);
+          const rawResponse = await callAI(model, apiKey, geminiApiKey, messages, systemPrompt || undefined);
           const { response: cleanResponse, title } = parseTitleFromResponse(rawResponse);
           set((state) => {
-            const nodes = state.nodes.map(n =>
+            const updatedNodes = state.nodes.map(n =>
               n.id === newNodeId
                 ? { ...n, data: { ...n.data, response: cleanResponse, title, isLoading: false } }
                 : n
             );
-            return { nodes, ...syncProject(state.projects, state.currentProjectId, nodes, state.edges) };
+            return { nodes: updatedNodes, ...syncProject(state.projects, state.currentProjectId, updatedNodes, state.edges) };
           });
         } catch (err) {
           const errorMsg = err instanceof Error ? err.message : 'Unknown error';
           set((state) => {
-            const nodes = state.nodes.map(n => n.id === newNodeId ? { ...n, data: { ...n.data, response: `Error: ${errorMsg}`, isLoading: false } } : n);
-            return { nodes, ...syncProject(state.projects, state.currentProjectId, nodes, state.edges) };
+            const updatedNodes = state.nodes.map(n =>
+              n.id === newNodeId
+                ? { ...n, data: { ...n.data, response: `Error: ${errorMsg}`, isLoading: false } }
+                : n
+            );
+            return { nodes: updatedNodes, ...syncProject(state.projects, state.currentProjectId, updatedNodes, state.edges) };
           });
         }
       },
@@ -756,7 +929,7 @@ export const useCanvasStore = create<CanvasStore>()(
       }),
 
       regenerateNode: async (nodeId: string) => {
-        const { nodes, edges, apiKey, geminiApiKey, model } = get();
+        const { nodes, edges, apiKey, geminiApiKey, model, systemPrompt } = get();
         const node = nodes.find(n => n.id === nodeId);
         if (!node || node.data.type !== 'thoughtNode') return;
         const data = node.data as ThoughtNodeData;
@@ -766,11 +939,27 @@ export const useCanvasStore = create<CanvasStore>()(
           return { nodes: newNodes, ...syncProject(state.projects, state.currentProjectId, newNodes, state.edges) };
         });
 
-        const path = getAncestralPath(nodeId, nodes, edges);
-        const messages = [...buildMessagesFromPath(path.slice(0, -1)), { role: 'user' as const, content: data.prompt }];
+        // Use DAG ancestors from all direct parents of this node
+        const parentIds = edges.filter(e => e.target === nodeId).map(e => e.source);
+        const ancestors = parentIds.length > 0
+          ? getDAGAncestors(parentIds, nodes, edges)
+          : [];
+
+        let userContent = data.prompt;
+        if (data.references && data.references.length > 0) {
+          const contextParts = data.references
+            .map((c, i) => `【Context ${i + 1} (from: ${c.sourceNodeLabel})】:\n"${c.text}"`)
+            .join('\n\n');
+          userContent = `${contextParts}\n\n【User Question】:\n${data.prompt}\n\nPlease answer based on the above references and our conversation history.`;
+        }
+
+        const messages = [
+          ...buildMessagesFromPath(ancestors),
+          { role: 'user' as const, content: userContent },
+        ];
 
         try {
-          const rawResponse = await callAI(model, apiKey, geminiApiKey, messages);
+          const rawResponse = await callAI(model, apiKey, geminiApiKey, messages, systemPrompt || undefined);
           const { response: cleanResponse, title } = parseTitleFromResponse(rawResponse);
           set((state) => {
             const newNodes = state.nodes.map(n =>
