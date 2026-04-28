@@ -16,6 +16,38 @@ const NODE_HEIGHT_ESTIMATE = 140;
 const BRANCH_HORIZONTAL_GAP = 60;
 const MAIN_TIMELINE_X = 80;
 
+/** Unwrap all <mark class="cssClass"> tags from an HTML string, preserving text content. */
+function stripMarksByClass(html: string, cssClass: string): string {
+  if (!html || typeof document === 'undefined') return html;
+  const div = document.createElement('div');
+  div.innerHTML = html;
+  div.querySelectorAll(`mark.${cssClass}`).forEach(mark => {
+    const parent = mark.parentNode!;
+    while (mark.firstChild) parent.insertBefore(mark.firstChild, mark);
+    parent.removeChild(mark);
+  });
+  div.normalize();
+  return div.innerHTML;
+}
+
+/** Unwrap <mark class="cssClass"> tags whose textContent starts with textHint. */
+function stripMarkByText(html: string, cssClass: string, textHint: string): string {
+  if (!html || typeof document === 'undefined') return html;
+  const div = document.createElement('div');
+  div.innerHTML = html;
+  const needle = textHint.trim().slice(0, 40).toLowerCase();
+  div.querySelectorAll(`mark.${cssClass}`).forEach(mark => {
+    const t = (mark.textContent ?? '').trim().toLowerCase();
+    if (needle && t && (t.startsWith(needle.slice(0, 20)) || needle.startsWith(t.slice(0, 20)))) {
+      const parent = mark.parentNode!;
+      while (mark.firstChild) parent.insertBefore(mark.firstChild, mark);
+      parent.removeChild(mark);
+    }
+  });
+  div.normalize();
+  return div.innerHTML;
+}
+
 const TITLE_SYSTEM_PROMPT = `After your main response, you MUST append exactly one line in this format:
 <node_title>5-8 word summary of your response</node_title>
 Do not skip this. The title should summarize the key point of your answer.`;
@@ -612,7 +644,29 @@ export const useCanvasStore = create<CanvasStore>()(
       },
 
       deleteNode: (nodeId) => set((state) => {
-        const nodes = state.nodes.filter(n => n.id !== nodeId);
+        // Clean up quote-highlight marks in source nodes that were referenced by this node
+        const deletedNode = state.nodes.find(n => n.id === nodeId);
+        let nodes = state.nodes;
+        if (deletedNode?.data.type === 'thoughtNode') {
+          const refs = (deletedNode.data as ThoughtNodeData).references ?? [];
+          if (refs.length > 0) {
+            nodes = nodes.map(n => {
+              if (n.data.type !== 'thoughtNode') return n;
+              const d = n.data as ThoughtNodeData;
+              if (!d.markedHtml) return n;
+              const nodeRefs = refs.filter(r => r.sourceNodeId === n.id);
+              if (nodeRefs.length === 0) return n;
+              let html = d.markedHtml;
+              for (const ref of nodeRefs) {
+                html = ref.isFullNode
+                  ? stripMarksByClass(html, 'quote-highlight')
+                  : stripMarkByText(html, 'quote-highlight', ref.text);
+              }
+              return { ...n, data: { ...d, markedHtml: html } };
+            });
+          }
+        }
+        nodes = nodes.filter(n => n.id !== nodeId);
         const edges = state.edges.filter(e => e.source !== nodeId && e.target !== nodeId);
         return { nodes, edges, ...syncProject(state.projects, state.currentProjectId, nodes, edges) };
       }),
@@ -911,9 +965,14 @@ export const useCanvasStore = create<CanvasStore>()(
         const nodes = state.nodes.map(n => {
           if (n.id !== nodeId || n.data.type !== 'thoughtNode') return n;
           const d = n.data as ThoughtNodeData;
+          const ann = (d.annotations ?? []).find(a => a.id === annotationId);
+          // Remove the corresponding note-highlight mark from markedHtml
+          const markedHtml = ann && d.markedHtml
+            ? stripMarkByText(d.markedHtml, 'note-highlight', ann.selectedText)
+            : d.markedHtml;
           return {
             ...n,
-            data: { ...d, annotations: (d.annotations ?? []).filter(a => a.id !== annotationId) },
+            data: { ...d, markedHtml, annotations: (d.annotations ?? []).filter(a => a.id !== annotationId) },
           };
         });
         return { nodes, ...syncProject(state.projects, state.currentProjectId, nodes, state.edges) };

@@ -75,6 +75,13 @@ export async function verifyEmail(credential: string): Promise<string | null> {
   } catch { return null; }
 }
 
+/** Bypasses the cache and immediately fetches fresh data from the Sheet. */
+export async function forceRefreshWhitelist(): Promise<string[]> {
+  _cacheTs = 0;
+  _fetchPromise = null;
+  return getWhitelistedEmails();
+}
+
 export async function checkWhitelisted(email: string): Promise<boolean> {
   const sheetEmails = await getWhitelistedEmails();
   const fromEnv = (process.env.WHITELISTED_EMAILS ?? '')

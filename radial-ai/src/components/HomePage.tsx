@@ -97,6 +97,105 @@ function timeAgo(ts: number): string {
   return `${d}d ago`;
 }
 
+type DebugData = { count: number; emails: string[]; diag?: Record<string, unknown> };
+
+function WhitelistDebugToggle() {
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [data, setData] = useState<DebugData | null>(null);
+
+  const fetchList = async (force = false) => {
+    setLoading(true);
+    try {
+      const r = await fetch(`/api/whitelist-debug${force ? '?force=1' : ''}`);
+      const json = await r.json() as DebugData;
+      setData(json);
+    } catch {
+      setData(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleToggle = () => {
+    if (!open && !data) fetchList();
+    setOpen(o => !o);
+  };
+
+  return (
+    <div style={{ position: 'fixed', bottom: 0, left: 24, zIndex: 40, width: 320 }}>
+      {/* Floating list — slides up above the toggle button */}
+      {open && (
+        <div className="rounded-xl mb-1 overflow-hidden"
+          style={{
+            background: 'var(--bg-base)',
+            border: '1px solid var(--border-base)',
+            boxShadow: '0 -4px 24px rgba(0,0,0,0.12)',
+            maxHeight: 280,
+            overflowY: 'auto',
+          }}>
+          <div className="flex items-center justify-between px-3 py-2 sticky top-0"
+            style={{ background: 'var(--bg-base)', borderBottom: '1px solid var(--border-base)' }}>
+            <span className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>
+              {loading ? '讀取中…' : data ? `白名單 · ${data.count} 筆` : '讀取失敗'}
+            </span>
+            <button
+              onClick={(e) => { e.stopPropagation(); fetchList(true); }}
+              disabled={loading}
+              title="從 Google Sheet 重新抓取"
+              className="flex items-center gap-1 px-2 py-0.5 rounded text-xs transition-all"
+              style={{
+                color: 'var(--text-faint)',
+                border: '1px solid var(--border-base)',
+                opacity: loading ? 0.5 : 1,
+                cursor: loading ? 'default' : 'pointer',
+              }}
+              onMouseEnter={(e) => { if (!loading) (e.currentTarget as HTMLElement).style.color = '#f472b6'; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--text-faint)'; }}
+            >
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M23 4v6h-6"/><path d="M1 20v-6h6"/>
+                <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+              </svg>
+              重新整理
+            </button>
+          </div>
+          <ul className="px-3 py-2 space-y-1">
+            {data && data.emails.length > 0
+              ? data.emails.map((email) => (
+                  <li key={email} className="text-xs font-mono py-0.5" style={{ color: 'var(--text-body)' }}>
+                    {email}
+                  </li>
+                ))
+              : data
+                ? <li className="text-xs" style={{ color: 'var(--text-faint)' }}>（清單是空的）</li>
+                : null}
+          </ul>
+        </div>
+      )}
+
+      {/* Toggle tab */}
+      <button
+        onClick={handleToggle}
+        className="w-full flex items-center justify-center gap-1.5 py-1.5 text-xs transition-colors"
+        style={{
+          background: 'var(--bg-topbar)',
+          borderTop: '1px solid var(--border-base)',
+          borderLeft: '1px solid var(--border-base)',
+          borderRight: '1px solid var(--border-base)',
+          borderRadius: open ? '0' : '10px 10px 0 0',
+          color: 'var(--text-faint)',
+        }}
+        onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--text-muted)'; }}
+        onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--text-faint)'; }}
+      >
+        <span style={{ transform: open ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform 0.2s', display: 'inline-block' }}>▲</span>
+        白名單 Debug
+      </button>
+    </div>
+  );
+}
+
 export default function HomePage() {
   const { projects, createProject, openProject, deleteProject, renameProject, apiKey, geminiApiKey, model, theme, toggleTheme } = useCanvasStore();
   const { user, login, logout, isWhitelisted, setWhitelisted } = useAuthStore();
@@ -354,6 +453,7 @@ export default function HomePage() {
             </p>
           </div>
         )}
+
       </div>
 
       {/* New canvas modal */}
@@ -448,6 +548,7 @@ export default function HomePage() {
 
       {showApiModal && <ApiKeyModal onClose={() => setShowApiModal(false)} />}
       <UsageBar />
+      <WhitelistDebugToggle />
     </div>
   );
 }
