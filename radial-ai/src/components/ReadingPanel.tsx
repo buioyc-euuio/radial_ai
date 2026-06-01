@@ -317,7 +317,7 @@ interface ToolbarState {
 
 export default function ReadingPanel() {
   const {
-    selectedNodeId, nodes, edges, setSelectedNode,
+    selectedNodeId, nodes, setSelectedNode,
     addContextCapsule, updateMarkedHtml, updateNodeTitle,
     addAnnotation, updateAnnotation, sendPrompt,
   } = useCanvasStore();
@@ -332,13 +332,13 @@ export default function ReadingPanel() {
   const [focusedAnnotationId, setFocusedAnnotationId] = useState<string | null>(null);
   const activeAnnotationId = focusedAnnotationId ?? hoveredAnnotationId;
   const promptBoxHeightRef = useRef(70);
-  promptBoxHeightRef.current = promptBoxHeight;
+  useEffect(() => { promptBoxHeightRef.current = promptBoxHeight; }, [promptBoxHeight]);
 
   const responseRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const promptRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
-  const newAnnIdRef = useRef<string | null>(null);
+  const [newAnnId, setNewAnnId] = useState<string | null>(null);
   const promptHandleIndicatorRef = useRef<HTMLDivElement>(null);
   const savedRangeRef = useRef<Range | null>(null);
   const pendingScrollTextRef = useRef<string | null>(null);
@@ -348,8 +348,8 @@ export default function ReadingPanel() {
     ? (selectedNode.data as ThoughtNodeData)
     : null;
 
-  const annotations: Annotation[] = nodeData?.annotations ?? [];
-  const nodeNumbers = useMemo(() => computeNodeNumbers(nodes, edges), [nodes, edges]);
+  const annotations: Annotation[] = useMemo(() => nodeData?.annotations ?? [], [nodeData]);
+  const nodeNumbers = useMemo(() => computeNodeNumbers(nodes), [nodes]);
 
   // The displayed HTML — uses markedHtml if available (contains Range-based marks)
   const highlightedHtml = useMemo(() => {
@@ -413,6 +413,7 @@ export default function ReadingPanel() {
 
   // Reset when node changes
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- resetting transient UI state on node switch
     setToolbar(null);
     setEditingTitle(false);
     savedRangeRef.current = null;
@@ -530,7 +531,7 @@ export default function ReadingPanel() {
 
     // Apply quote highlight via Range
     if (range && responseRef.current) {
-      try { applyMarkToRange(range, 'quote-highlight', responseRef.current); } catch {}
+      try { applyMarkToRange(range, 'quote-highlight', responseRef.current); } catch { /* ignore invalid range */ }
       updateMarkedHtml(sourceNodeId, responseRef.current.innerHTML);
     }
 
@@ -548,11 +549,11 @@ export default function ReadingPanel() {
     if (toolbar.source === 'annotation' && toolbar.annotationId && range) {
       const noteEl = document.querySelector(`[data-annotation-id="${toolbar.annotationId}"]`);
       if (noteEl) {
-        try { applyMarkToRange(range, 'pen-highlight', noteEl as HTMLElement); } catch {}
+        try { applyMarkToRange(range, 'pen-highlight', noteEl as HTMLElement); } catch { /* ignore invalid range */ }
         updateAnnotation(selectedNodeId, toolbar.annotationId, noteEl.innerHTML);
       }
     } else if (toolbar.source === 'response' && responseRef.current && range) {
-      try { applyMarkToRange(range, 'pen-highlight', responseRef.current); } catch {}
+      try { applyMarkToRange(range, 'pen-highlight', responseRef.current); } catch { /* ignore invalid range */ }
       updateMarkedHtml(selectedNodeId, responseRef.current.innerHTML);
     }
 
@@ -582,12 +583,12 @@ export default function ReadingPanel() {
 
     // Apply note-highlight (blue) via Range in response
     if (range && responseRef.current && toolbar.source === 'response') {
-      try { applyMarkToRange(range, 'note-highlight', responseRef.current); } catch {}
+      try { applyMarkToRange(range, 'note-highlight', responseRef.current); } catch { /* ignore invalid range */ }
       updateMarkedHtml(selectedNodeId, responseRef.current.innerHTML);
     }
 
     const id = addAnnotation(selectedNodeId, toolbar.selectedText);
-    newAnnIdRef.current = id;
+    setNewAnnId(id);
     savedRangeRef.current = null;
     setToolbar(null);
     window.getSelection()?.removeAllRanges();
@@ -941,8 +942,8 @@ export default function ReadingPanel() {
                     key={ann.id}
                     annotation={ann}
                     nodeId={selectedNodeId!}
-                    autoFocus={newAnnIdRef.current === ann.id}
-                    onFocusHandled={() => { newAnnIdRef.current = null; }}
+                    autoFocus={newAnnId === ann.id}
+                    onFocusHandled={() => setNewAnnId(null)}
                     onScrollTo={handleAnnotationScrollTo}
                     onSendToAI={() => handleAnnotationAI(ann)}
                     onHoverStart={() => setHoveredAnnotationId(ann.id)}

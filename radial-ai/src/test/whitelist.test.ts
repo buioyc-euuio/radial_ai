@@ -3,7 +3,7 @@
  * Run with: npm test -- whitelist
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 

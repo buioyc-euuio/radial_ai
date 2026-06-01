@@ -12,11 +12,17 @@ vi.mock('../../store/canvasStore', () => ({
   useCanvasStore: () => ({
     get selectedNodeId() { return mockSelectedId },
     get nodes() { return mockNodes },
+    edges: [],
+    setSelectedNode: vi.fn(),
     addContextCapsule: mockAddCapsule,
     addHighlight: vi.fn(),
+    updateMarkedHtml: vi.fn(),
+    updateNodeTitle: vi.fn(),
+    sendPrompt: vi.fn(),
     addAnnotation: vi.fn().mockReturnValue('new-ann-id'),
     updateAnnotation: vi.fn(),
     deleteAnnotation: vi.fn(),
+    addAnnotationMessage: vi.fn(),
   }),
 }))
 
@@ -111,6 +117,7 @@ describe('ReadingPanel — floating toolbar', () => {
     const mockRange = {
       getBoundingClientRect: () => ({ left: 100, right: 200, top: 50, bottom: 70, width: 100, height: 20, x: 100, y: 50, toJSON: () => ({}) }),
       commonAncestorContainer: responseDiv,
+      cloneRange() { return this },
     }
     vi.spyOn(window, 'getSelection').mockReturnValue({
       isCollapsed: false,
@@ -121,9 +128,9 @@ describe('ReadingPanel — floating toolbar', () => {
 
     fireEvent.mouseUp(document)
 
-    expect(screen.getByRole('button', { name: '引用 (⌘K)' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '螢光筆標記' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '新增筆記' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '引用' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '螢光筆' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '筆記' })).toBeInTheDocument()
   })
 
   it('toolbar disappears when clicking outside the panel', () => {
@@ -133,6 +140,7 @@ describe('ReadingPanel — floating toolbar', () => {
     const mockRange = {
       getBoundingClientRect: () => ({ left: 100, right: 200, top: 50, bottom: 70, width: 100, height: 20, x: 100, y: 50, toJSON: () => ({}) }),
       commonAncestorContainer: responseDiv,
+      cloneRange() { return this },
     }
     vi.spyOn(window, 'getSelection').mockReturnValue({
       isCollapsed: false,
@@ -142,10 +150,10 @@ describe('ReadingPanel — floating toolbar', () => {
     } as unknown as Selection)
 
     fireEvent.mouseUp(document)
-    expect(screen.getByRole('button', { name: '引用 (⌘K)' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '引用' })).toBeInTheDocument()
 
     fireEvent.mouseDown(document.body)
-    expect(screen.queryByRole('button', { name: '引用 (⌘K)' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '引用' })).not.toBeInTheDocument()
   })
 
   it('Quote button calls addContextCapsule with selected text', () => {
@@ -155,6 +163,7 @@ describe('ReadingPanel — floating toolbar', () => {
     const mockRange = {
       getBoundingClientRect: () => ({ left: 100, right: 200, top: 50, bottom: 70, width: 100, height: 20, x: 100, y: 50, toJSON: () => ({}) }),
       commonAncestorContainer: responseDiv,
+      cloneRange() { return this },
     }
     vi.spyOn(window, 'getSelection').mockReturnValue({
       isCollapsed: false,
@@ -164,7 +173,7 @@ describe('ReadingPanel — floating toolbar', () => {
     } as unknown as Selection)
 
     fireEvent.mouseUp(document)
-    fireEvent.click(screen.getByRole('button', { name: '引用 (⌘K)' }))
+    fireEvent.click(screen.getByRole('button', { name: '引用' }))
 
     expect(mockAddCapsule).toHaveBeenCalledOnce()
     expect(mockAddCapsule.mock.calls[0][0].text).toBe('selected text to quote')
@@ -181,7 +190,7 @@ describe('ReadingPanel — floating toolbar', () => {
     } as unknown as Selection)
 
     fireEvent.mouseUp(document)
-    expect(screen.queryByRole('button', { name: '引用 (⌘K)' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '引用' })).not.toBeInTheDocument()
   })
 
   it('toolbar resets when switching to a different node', () => {
@@ -191,6 +200,7 @@ describe('ReadingPanel — floating toolbar', () => {
     const mockRange = {
       getBoundingClientRect: () => ({ left: 100, right: 200, top: 50, bottom: 70, width: 100, height: 20, x: 100, y: 50, toJSON: () => ({}) }),
       commonAncestorContainer: responseDiv,
+      cloneRange() { return this },
     }
     vi.spyOn(window, 'getSelection').mockReturnValue({
       isCollapsed: false,
@@ -200,7 +210,7 @@ describe('ReadingPanel — floating toolbar', () => {
     } as unknown as Selection)
 
     fireEvent.mouseUp(document)
-    expect(screen.getByRole('button', { name: '引用 (⌘K)' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '引用' })).toBeInTheDocument()
 
     mockSelectedId = 'node-2'
     mockNodes = [{
@@ -217,6 +227,6 @@ describe('ReadingPanel — floating toolbar', () => {
     }]
     rerender(<ReadingPanel />)
 
-    expect(screen.queryByRole('button', { name: '引用 (⌘K)' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '引用' })).not.toBeInTheDocument()
   })
 })

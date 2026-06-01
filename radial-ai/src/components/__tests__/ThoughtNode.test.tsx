@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import type { ComponentProps } from 'react'
 import { render, screen, fireEvent } from '@testing-library/react'
 import ThoughtNode from '../ThoughtNode'
 
@@ -14,12 +15,13 @@ vi.mock('../../store/canvasStore', () => ({
   useCanvasStore: () => ({
     get selectedNodeId() { return mockSelectedId },
     deleteNode: mockDeleteNode,
+    nodes: [],
+    edges: [],
   }),
 }))
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const renderNode = (id: string, data: Record<string, unknown>) =>
-  render(<ThoughtNode {...({ id, data } as any)} />)
+  render(<ThoughtNode {...({ id, data } as unknown as ComponentProps<typeof ThoughtNode>)} />)
 
 beforeEach(() => {
   mockDeleteNode.mockClear()

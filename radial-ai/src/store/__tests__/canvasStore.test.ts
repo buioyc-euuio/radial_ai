@@ -64,7 +64,7 @@ describe('contextCapsules', () => {
 })
 
 describe('deleteNode', () => {
-  it('converts thought node to placeholder', () => {
+  it('removes the thought node from the nodes array', () => {
     useCanvasStore.setState({
       nodes: [{
         id: 'n1',
@@ -74,21 +74,20 @@ describe('deleteNode', () => {
       }],
     })
     useCanvasStore.getState().deleteNode('n1')
-    const node = useCanvasStore.getState().nodes[0]
-    expect(node.data.type).toBe('placeholderNode')
+    expect(useCanvasStore.getState().nodes).toHaveLength(0)
   })
 
-  it('does not remove the node from the nodes array', () => {
+  it('removes edges connected to the deleted node', () => {
     useCanvasStore.setState({
-      nodes: [{
-        id: 'n1',
-        type: 'thoughtNode',
-        position: { x: 0, y: 0 },
-        data: { type: 'thoughtNode', prompt: 'p', response: 'r', isLoading: false, isCollapsed: false },
-      }],
+      nodes: [
+        { id: 'n1', type: 'thoughtNode', position: { x: 0, y: 0 }, data: { type: 'thoughtNode', prompt: 'p', response: 'r', isLoading: false, isCollapsed: false } },
+        { id: 'n2', type: 'thoughtNode', position: { x: 0, y: 0 }, data: { type: 'thoughtNode', prompt: 'p2', response: 'r2', isLoading: false, isCollapsed: false } },
+      ],
+      edges: [{ id: 'e1', source: 'n1', target: 'n2' }],
     })
     useCanvasStore.getState().deleteNode('n1')
     expect(useCanvasStore.getState().nodes).toHaveLength(1)
+    expect(useCanvasStore.getState().edges).toHaveLength(0)
   })
 })
 
@@ -114,9 +113,9 @@ describe('createProject', () => {
     expect(state.view).toBe('canvas')
   })
 
-  it('first project gets demo nodes', () => {
+  it('creates an empty project (onboarding lives in the seeded Tutorial project)', () => {
     useCanvasStore.getState().createProject('First')
-    expect(useCanvasStore.getState().nodes.length).toBeGreaterThan(0)
+    expect(useCanvasStore.getState().nodes).toHaveLength(0)
   })
 
   it('second project starts empty', () => {

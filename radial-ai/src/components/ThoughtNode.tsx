@@ -6,13 +6,13 @@ import { computeNodeNumbers } from '../utils/nodeNumbers';
 
 function ThoughtNode({ id, data }: NodeProps) {
   const nodeData = data as ThoughtNodeData;
-  const { selectedNodeId, deleteNode, nodes, edges } = useCanvasStore();
+  const { selectedNodeId, deleteNode, nodes } = useCanvasStore();
   const isSelected = selectedNodeId === id;
 
   const nodeNum = useMemo(() => {
-    const map = computeNodeNumbers(nodes, edges);
+    const map = computeNodeNumbers(nodes);
     return map.get(id) ?? '';
-  }, [nodes, edges, id]);
+  }, [nodes, id]);
 
   if (nodeData.type !== 'thoughtNode') return null;
 

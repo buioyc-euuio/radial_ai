@@ -204,6 +204,7 @@ function CanvasView() {
 
   // Dismiss modal once a key is set
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing modal visibility to key presence
     if (activeKeySet) setShowApiModal(false);
   }, [activeKeySet]);
 

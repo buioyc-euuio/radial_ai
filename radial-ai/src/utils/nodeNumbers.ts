@@ -2,7 +2,6 @@
 // it appears in the nodes array (which mirrors insertion / creation order).
 export function computeNodeNumbers(
   nodes: Array<{ id: string; data?: { type?: string } }>,
-  _edges: unknown[],
 ): Map<string, string> {
   const numbers = new Map<string, string>();
   let counter = 1;

@@ -1,5 +1,11 @@
 import { google } from 'googleapis';
 
+// ── Manual whitelist (always allowed, independent of Sheet/form) ──────────────
+// Fallback for accounts that must work regardless of the Google Form → Sheet sync.
+const MANUAL_WHITELIST = [
+  'yaan.md13@nycu.edu.tw',
+];
+
 // ── Google Sheet config ───────────────────────────────────────────────────────
 const SHEET_RANGE = "'表單回覆 1'!C2:C";
 
@@ -86,6 +92,7 @@ export async function checkWhitelisted(email: string): Promise<boolean> {
   const sheetEmails = await getWhitelistedEmails();
   const fromEnv = (process.env.WHITELISTED_EMAILS ?? '')
     .split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
-  const all = new Set([...sheetEmails, ...fromEnv]);
+  const manual = MANUAL_WHITELIST.map(e => e.trim().toLowerCase());
+  const all = new Set([...sheetEmails, ...fromEnv, ...manual]);
   return all.has(email.toLowerCase());
 }

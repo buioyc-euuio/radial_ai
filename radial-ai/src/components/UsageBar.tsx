@@ -32,6 +32,7 @@ export default function UsageBar() {
 
   useEffect(() => {
     if (!isWhitelisted || !credential) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetching usage data from external API is a valid effect
     void fetchUsage();
     const id = setInterval(() => void fetchUsage(), 60_000);
     return () => clearInterval(id);
