@@ -589,7 +589,11 @@ export const useCanvasStore = create<CanvasStore>()(
     (set, get) => ({
       // Navigation
       view: 'home',
-      projects: [],
+      // Seed starter canvases (tutorial + about) into the default state so that
+      // brand-new visitors with empty storage — for whom persist's `merge`
+      // never runs — still see the two initial canvases. Returning users get
+      // them re-seeded via the version check in `merge` below.
+      projects: [createTutorialProject(), createAboutProject()],
       currentProjectId: null,
 
       // Working canvas
@@ -606,7 +610,7 @@ export const useCanvasStore = create<CanvasStore>()(
       geminiApiKey: '',
       model: 'gemini-3.1-flash-lite-preview',
       theme: 'light',
-      starterSeedVersion: 0,
+      starterSeedVersion: STARTER_SEED_VERSION,
 
       // ── Project management ──────────────────────────────────────────────
       createProject: (name) => {

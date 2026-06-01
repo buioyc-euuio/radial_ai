@@ -72,6 +72,7 @@
   - 版本化種子機制：以 `STARTER_SEED_VERSION`（取代舊 `tutorialSeeded` 布林）控管。`merge` 時若持久化版本落後，會移除舊 starter 副本並重新植入最新兩個畫布，不影響使用者自建專案。
 
 #### Fixed
+- 初始畫布對「全新訪客」不顯示：Zustand persist 的 `merge` 只在 storage 已有資料時觸發，空 IndexedDB 的首訪者（含未登入）不會跑 `merge`，導致 `projects` 維持 `[]`。修法：在預設 state 直接植入 `createTutorialProject()` + `createAboutProject()` 並設 `starterSeedVersion: STARTER_SEED_VERSION`；既有使用者仍由 `merge` 的版本檢查重新植入。
 - 測試套件：16 個失敗的過時測試全數修復 → 70/70 通過（`ThoughtNode` / `canvasStore` / `ReadingPanel`）。
 - Lint：11 errors + 警告全數清除 → 0 errors / 0 warnings（`nodeNumbers` 移除未用參數、`ReadingPanel` 空 catch、ref 用法重構、effect setState 加註）。
 
