@@ -7,7 +7,7 @@ import {
 import { v4 as uuidv4 } from 'uuid';
 import { get as idbGet, set as idbSet, del as idbDel } from 'idb-keyval';
 import type { NodeData, ContextCapsule, ThoughtNodeData, AnnotationNodeData } from './types';
-import { useAuthStore } from './authStore';
+import { useAuthStore, hasDevKeyAccess } from './authStore';
 import { calculateOptimalPosition } from '../utils/autoLayout';
 
 const NODE_WIDTH = 220;
@@ -552,15 +552,17 @@ async function callAI(
   messages: { role: 'user' | 'assistant'; content: string }[],
   canvasSystemPrompt?: string,
 ): Promise<string> {
-  const { devMode, credential, isWhitelisted } = useAuthStore.getState();
+  const authState = useAuthStore.getState();
+  const { devMode, credential } = authState;
 
   // Merge canvas persona prompt with the title-extraction instruction
   const systemPrompt = canvasSystemPrompt
     ? `${canvasSystemPrompt}\n\n${TITLE_SYSTEM_PROMPT}`
     : TITLE_SYSTEM_PROMPT;
 
-  // Dev mode: route through backend proxy (uses server PROD_API_KEY, model locked server-side)
-  if (devMode && isWhitelisted && credential) {
+  // Dev mode: route through backend proxy (uses server PROD_API_KEY, model locked server-side).
+  // Available to whitelisted testers and to users within their free trial.
+  if (devMode && hasDevKeyAccess(authState) && credential) {
     const res = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
