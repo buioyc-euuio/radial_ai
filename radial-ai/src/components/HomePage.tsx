@@ -9,7 +9,7 @@ import logo from '../assets/logo-transparent.png';
 
 const GOOGLE_CLIENT_ID_SET = !!import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
-function decodeJwt(token: string): Record<string, string> {
+export function decodeJwt(token: string): Record<string, string> {
   const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
   const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
   return JSON.parse(new TextDecoder().decode(bytes));
@@ -17,7 +17,7 @@ function decodeJwt(token: string): Record<string, string> {
 
 // Uses the credential (ID-token) flow — only needs Authorized JavaScript origins,
 // no redirect URI configuration required in Google Cloud Console.
-async function fetchAccessStatus(
+export async function fetchAccessStatus(
   credential: string,
 ): Promise<{ isWhitelisted: boolean; trial: TrialStatus | null }> {
   try {

@@ -23,6 +23,7 @@ import UsageBar from './components/UsageBar';
 import FloatingEdge from './components/FloatingEdge';
 import PersonaModal from './components/PersonaModal';
 import HomePage from './components/HomePage';
+import ReloginBanner from './components/ReloginBanner';
 
 const nodeTypes: NodeTypes = {
   thoughtNode: ThoughtNode,
@@ -481,5 +482,10 @@ export default function App() {
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
-  return view === 'home' ? <HomePage /> : <CanvasView />;
+  return (
+    <>
+      <ReloginBanner />
+      {view === 'home' ? <HomePage /> : <CanvasView />}
+    </>
+  );
 }
