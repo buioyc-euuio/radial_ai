@@ -9,11 +9,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).end();
 
   const { credential } = req.body as { credential?: string };
-  if (!credential) return res.status(401).json({ error: 'Missing credential' });
+  if (!credential) return res.status(401).json({ error: '登入已過期，請重新登入', code: 'AUTH_EXPIRED' });
 
   const email = await verifyEmail(credential);
-  if (!email || !await checkWhitelisted(email)) {
-    return res.status(403).json({ error: 'Not whitelisted' });
+  if (!email) return res.status(401).json({ error: '登入已過期，請重新登入', code: 'AUTH_EXPIRED' });
+  if (!await checkWhitelisted(email)) {
+    return res.status(403).json({ error: '免費試用已結束，且不在白名單中', code: 'NO_ACCESS' });
   }
 
   const month = new Date().toISOString().slice(0, 7);

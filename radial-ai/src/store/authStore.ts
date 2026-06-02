@@ -19,12 +19,14 @@ interface AuthStore {
   isWhitelisted: boolean;
   trial: TrialStatus | null;   // 3-day free trial of the developer API key
   devMode: boolean;            // true = use backend PROD_API_KEY
+  authExpired: boolean;        // Google ID-token expired — prompt re-login
 
   login: (user: GoogleUser, credential: string) => void;
   logout: () => void;
   setWhitelisted: (v: boolean) => void;
   setTrial: (t: TrialStatus | null) => void;
   setDevMode: (v: boolean) => void;
+  markAuthExpired: () => void;
 }
 
 /** Whether the signed-in user may use the developer (PROD) API key. */
@@ -40,12 +42,16 @@ export const useAuthStore = create<AuthStore>()(
       isWhitelisted: false,
       trial: null,
       devMode: false,
+      authExpired: false,
 
-      login: (user, credential) => set({ user, credential }),
-      logout: () => set({ user: null, credential: null, isWhitelisted: false, trial: null, devMode: false }),
+      login: (user, credential) => set({ user, credential, authExpired: false }),
+      logout: () => set({ user: null, credential: null, isWhitelisted: false, trial: null, devMode: false, authExpired: false }),
       setWhitelisted: (v) => set({ isWhitelisted: v }),
       setTrial: (t) => set({ trial: t }),
       setDevMode: (v) => set({ devMode: v }),
+      // Keep `user` (for the name/avatar in the re-login prompt) but drop the
+      // dead credential so nothing keeps retrying with an expired token.
+      markAuthExpired: () => set({ credential: null, authExpired: true }),
     }),
     {
       name: 'radial-ai-auth',

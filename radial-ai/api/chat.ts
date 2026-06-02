@@ -36,16 +36,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     system?: string;
   };
 
-  if (!credential) return res.status(401).json({ error: 'Missing credential' });
+  if (!credential) return res.status(401).json({ error: '登入已過期，請重新登入', code: 'AUTH_EXPIRED' });
   const email = await verifyEmail(credential);
-  if (!email) return res.status(403).json({ error: 'Not whitelisted' });
+  // Token failed verification (most often: the Google ID token expired, ~1h
+  // lifetime). This is NOT an access problem — surface 401 so the client can
+  // prompt a fresh sign-in instead of a misleading "not whitelisted".
+  if (!email) return res.status(401).json({ error: '登入已過期，請重新登入', code: 'AUTH_EXPIRED' });
 
   // Access to the developer key is granted to whitelisted users OR anyone
   // within their 3-day free trial (the clock is established on first login).
   const whitelisted = await checkWhitelisted(email);
   const trialActive = whitelisted || (await getTrialStatus(email, { establish: true })).active;
   if (!whitelisted && !trialActive) {
-    return res.status(403).json({ error: 'Trial expired' });
+    return res.status(403).json({ error: '免費試用已結束，且不在白名單中', code: 'NO_ACCESS' });
   }
 
   if (!PROD_API_KEY) return res.status(503).json({ error: 'Server API key not configured' });

@@ -569,8 +569,13 @@ async function callAI(
       body: JSON.stringify({ credential, messages, system: systemPrompt }),
     });
     if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error((err as { error?: string }).error ?? `Server error ${res.status}`);
+      const err = await res.json().catch(() => ({})) as { error?: string; code?: string };
+      // Expired Google ID-token: drop the dead credential and prompt re-login.
+      if (res.status === 401 || err.code === 'AUTH_EXPIRED') {
+        useAuthStore.getState().markAuthExpired();
+        throw new Error(err.error ?? '登入已過期，請重新登入');
+      }
+      throw new Error(err.error ?? `Server error ${res.status}`);
     }
     const data = await res.json() as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
     return data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
