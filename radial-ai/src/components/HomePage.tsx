@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { GoogleLogin, type CredentialResponse } from '@react-oauth/google';
 import { useCanvasStore } from '../store/canvasStore';
-import { useAuthStore, type GoogleUser } from '../store/authStore';
+import { useAuthStore, type GoogleUser, type TrialStatus } from '../store/authStore';
 import ApiKeyModal from './ApiKeyModal';
 import UsageBar from './UsageBar';
 import { getModelProvider } from '../store/canvasStore';
@@ -17,16 +17,18 @@ function decodeJwt(token: string): Record<string, string> {
 
 // Uses the credential (ID-token) flow — only needs Authorized JavaScript origins,
 // no redirect URI configuration required in Google Cloud Console.
-async function checkWhitelist(credential: string): Promise<boolean> {
+async function fetchAccessStatus(
+  credential: string,
+): Promise<{ isWhitelisted: boolean; trial: TrialStatus | null }> {
   try {
     const r = await fetch('/api/check-whitelist', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ credential }),
     });
-    const data = await r.json() as { isWhitelisted?: boolean };
-    return data.isWhitelisted ?? false;
-  } catch { return false; }
+    const data = await r.json() as { isWhitelisted?: boolean; trial?: TrialStatus | null };
+    return { isWhitelisted: data.isWhitelisted ?? false, trial: data.trial ?? null };
+  } catch { return { isWhitelisted: false, trial: null }; }
 }
 
 function GoogleLoginBtn({ onLogin }: { onLogin: (u: GoogleUser, credential: string) => void }) {
@@ -198,13 +200,18 @@ function WhitelistDebugToggle() {
 
 export default function HomePage() {
   const { projects, createProject, openProject, deleteProject, renameProject, apiKey, geminiApiKey, model, theme, toggleTheme } = useCanvasStore();
-  const { user, login, logout, isWhitelisted, setWhitelisted } = useAuthStore();
+  const { user, login, logout, isWhitelisted, setWhitelisted, trial, setTrial, setDevMode } = useAuthStore();
 
   const handleLogin = async (u: GoogleUser, credential: string) => {
     login(u, credential);
-    const wl = await checkWhitelist(credential);
+    const { isWhitelisted: wl, trial: t } = await fetchAccessStatus(credential);
     setWhitelisted(wl);
+    setTrial(t);
+    // Auto-enable dev-key routing during an active trial so it works out of the box.
+    if (!wl && t?.active) setDevMode(true);
   };
+
+  const trialActive = !isWhitelisted && !!trial?.active;
   const [showNewModal, setShowNewModal] = useState(false);
   const [newName, setNewName] = useState('');
   const [showApiModal, setShowApiModal] = useState(false);
@@ -273,6 +280,15 @@ export default function HomePage() {
                   <span className="text-xs font-semibold hidden sm:inline" style={{ color: 'var(--text-body)' }}>
                     {isWhitelisted ? `尊貴的測試者 ${user.name.split(' ')[0]}，您好` : `${user.name.split(' ')[0]}，你好`}
                   </span>
+                  {trialActive && (
+                    <span
+                      className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap"
+                      style={{ background: 'linear-gradient(90deg,#fef9c3,#fefce8)', color: '#92400e', border: '1px solid #fde68a' }}
+                      title={`免費試用我的 API Key，剩餘 ${trial?.daysLeft} 天`}
+                    >
+                      免費試用 · 剩 {trial?.daysLeft} 天
+                    </span>
+                  )}
                 </div>
                 <button
                   onClick={logout}
@@ -335,6 +351,11 @@ export default function HomePage() {
           <p className="text-sm" style={{ color: 'var(--text-faint)' }}>
             {user ? `歡迎回來，${user.email}` : 'Each canvas is an infinite space for AI-powered thinking.'}
           </p>
+          {trialActive && (
+            <p className="text-xs mt-1.5" style={{ color: '#92400e' }}>
+              🎁 你正在免費試用開發者 API Key，還剩 <b>{trial?.daysLeft}</b> 天 — 無需自備金鑰即可使用。
+            </p>
+          )}
         </div>
 
         {/* New canvas button + grid */}

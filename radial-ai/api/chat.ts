@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { kv } from '@vercel/kv';
 import { verifyEmail, checkWhitelisted } from './_whitelist.js';
+import { getTrialStatus } from './_trial.js';
 
 const PROD_API_KEY = process.env.PROD_API_KEY ?? '';
 const LOCKED_MODEL = 'gemini-3.1-flash-lite-preview';
@@ -37,8 +38,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (!credential) return res.status(401).json({ error: 'Missing credential' });
   const email = await verifyEmail(credential);
-  if (!email || !await checkWhitelisted(email)) {
-    return res.status(403).json({ error: 'Not whitelisted' });
+  if (!email) return res.status(403).json({ error: 'Not whitelisted' });
+
+  // Access to the developer key is granted to whitelisted users OR anyone
+  // within their 3-day free trial (the clock is established on first login).
+  const whitelisted = await checkWhitelisted(email);
+  const trialActive = whitelisted || (await getTrialStatus(email, { establish: true })).active;
+  if (!whitelisted && !trialActive) {
+    return res.status(403).json({ error: 'Trial expired' });
   }
 
   if (!PROD_API_KEY) return res.status(503).json({ error: 'Server API key not configured' });

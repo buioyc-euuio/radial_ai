@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useCanvasStore } from '../store/canvasStore';
 import { getModelProvider } from '../store/canvasStore';
-import { useAuthStore } from '../store/authStore';
+import { useAuthStore, hasDevKeyAccess } from '../store/authStore';
 
 const MODEL_GROUPS = [
   {
@@ -31,7 +31,9 @@ const DEV_MODE_AVAILABLE = !!DEV_GEMINI_KEY && DEV_GEMINI_KEY !== 'your_gemini_a
 
 export default function ApiKeyModal({ onClose }: { onClose: () => void }) {
   const { apiKey, geminiApiKey, model, setApiKey, setGeminiApiKey, setModel, theme } = useCanvasStore();
-  const { isWhitelisted, devMode, setDevMode } = useAuthStore();
+  const { isWhitelisted, trial, devMode, setDevMode } = useAuthStore();
+  const canUseDevKey = hasDevKeyAccess({ isWhitelisted, trial });
+  const trialActive = !isWhitelisted && !!trial?.active;
   const [anthropicInput, setAnthropicInput] = useState(apiKey);
   const [geminiInput, setGeminiInput] = useState(geminiApiKey);
   const [selectedModel, setSelectedModel] = useState(model);
@@ -156,13 +158,13 @@ export default function ApiKeyModal({ onClose }: { onClose: () => void }) {
                   <div className="grid grid-cols-2 gap-1.5">
                     {group.models.filter(m => !m.devOnly || DEV_MODE_AVAILABLE).map((m) => {
                       const active = selectedModel === m.id;
-                      const lockedOut = devMode && isWhitelisted && m.id !== 'gemini-3.1-flash-lite-preview';
+                      const lockedOut = devMode && canUseDevKey && m.id !== 'gemini-3.1-flash-lite-preview';
                       return (
                         <button
                           key={m.id}
                           onClick={() => !lockedOut && setSelectedModel(m.id)}
                           disabled={lockedOut}
-                          title={lockedOut ? '白名單模式已鎖定此模型' : (m as { recommended?: boolean }).recommended ? 'Recommended' : undefined}
+                          title={lockedOut ? '開發者模式已鎖定此模型' : (m as { recommended?: boolean }).recommended ? 'Recommended' : undefined}
                           className="text-left text-xs px-3 py-2 rounded-xl transition-all font-medium flex items-center gap-1"
                           style={lockedOut
                             ? { ...inactiveModelStyle, opacity: 0.35, cursor: 'not-allowed' }
@@ -184,7 +186,7 @@ export default function ApiKeyModal({ onClose }: { onClose: () => void }) {
 
           {/* API Keys */}
           <div className="space-y-2.5 mb-5">
-            {devMode && isWhitelisted ? (
+            {devMode && canUseDevKey ? (
               /* Dev mode: show a single locked placeholder row */
               <div className="rounded-xl p-3" style={{ background: 'var(--bg-inactive)', border: '1.5px solid var(--border-inactive)', opacity: 0.7 }}>
                 <div className="flex items-center gap-2 mb-2">
@@ -273,14 +275,14 @@ export default function ApiKeyModal({ onClose }: { onClose: () => void }) {
             </button>
           </div>
 
-          {/* Whitelist Dev Mode toggle */}
+          {/* Whitelist / Trial Dev Mode toggle */}
           <div style={{ borderTop: '1px solid var(--border-base)', paddingTop: 12 }}>
-            {isWhitelisted ? (
+            {canUseDevKey ? (
               /* Toggle row */
               <div className="flex items-center justify-between px-1">
                 <div>
                   <p className="text-xs font-semibold" style={{ color: isDark ? '#fbbf24' : '#92400e' }}>
-                    Developer Mode
+                    {trialActive ? `免費試用中 · 剩 ${trial?.daysLeft} 天` : 'Developer Mode'}
                   </p>
                   <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-faint)' }}>
                     {devMode ? '使用開發者 API Key（模型已鎖定）' : '使用你自己的 API Key'}
@@ -310,7 +312,7 @@ export default function ApiKeyModal({ onClose }: { onClose: () => void }) {
             )}
 
             {/* Legacy local Dev Mode (VITE key) — shown only when available */}
-            {DEV_MODE_AVAILABLE && !isWhitelisted && (
+            {DEV_MODE_AVAILABLE && !canUseDevKey && (
               <button
                 onClick={handleDevMode}
                 className="w-full mt-2 flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-mono font-semibold transition-all"
