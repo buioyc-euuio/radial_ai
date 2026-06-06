@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { kv } from '@vercel/kv';
 import { verifyEmail, checkWhitelisted } from './_whitelist.js';
+import { getTrialStatus } from './_trial.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -13,7 +14,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const email = await verifyEmail(credential);
   if (!email) return res.status(401).json({ error: '登入已過期，請重新登入', code: 'AUTH_EXPIRED' });
-  if (!await checkWhitelisted(email)) {
+
+  // Whitelisted testers and trial users (clock already started) may see usage.
+  const whitelisted = await checkWhitelisted(email);
+  const trial = await getTrialStatus(email);
+  if (!whitelisted && trial.startedAt == null) {
     return res.status(403).json({ error: '免費試用已結束，且不在白名單中', code: 'NO_ACCESS' });
   }
 
@@ -37,11 +42,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         outputTokens: toInt(pOutput),
       },
       total: { cost: toNum(tCost) },
+      trial,
     });
   } catch {
     return res.json({
       personal: { cost: 0, inputTokens: 0, outputTokens: 0 },
       total: { cost: 0 },
+      trial,
     });
   }
 }

@@ -1,12 +1,15 @@
 import { GoogleLogin, type CredentialResponse } from '@react-oauth/google';
 import { useAuthStore } from '../store/authStore';
+import { useCanvasStore } from '../store/canvasStore';
 import { decodeJwt, fetchAccessStatus } from './HomePage';
+import { LOCKED_MODEL } from './ApiKeyModal';
 
 // Shown when a chat/usage request fails because the stored Google ID-token has
 // expired (~1h lifetime). Lets the user re-authenticate in place without losing
 // their canvas, instead of seeing a misleading "not whitelisted" error.
 export default function ReloginBanner() {
   const { authExpired, user, login, setWhitelisted, setTrial, setDevMode, logout } = useAuthStore();
+  const setModel = useCanvasStore((s) => s.setModel);
 
   if (!authExpired) return null;
 
@@ -17,7 +20,7 @@ export default function ReloginBanner() {
     const { isWhitelisted: wl, trial: t } = await fetchAccessStatus(resp.credential);
     setWhitelisted(wl);
     setTrial(t);
-    if (!wl && t?.active) setDevMode(true);
+    if (!wl && t?.active) { setDevMode(true); setModel(LOCKED_MODEL); }
   };
 
   return (

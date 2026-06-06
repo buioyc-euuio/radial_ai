@@ -15,7 +15,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!email) return res.json({ isWhitelisted: false, trial: null });
 
   const isWhitelisted = await checkWhitelisted(email);
-  // First login establishes the 3-day trial clock for this email.
-  const trial = await getTrialStatus(email, { establish: true });
+  // Report-only: the trial clock is NOT started here. It starts when the user
+  // explicitly opts in via /api/activate-trial. A `startedAt: null` trial means
+  // "eligible but not yet activated".
+  const trial = await getTrialStatus(email);
   return res.json({ isWhitelisted, trial });
 }

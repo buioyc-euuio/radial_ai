@@ -15,8 +15,11 @@ function fmtCost(n: number): string {
 }
 
 export default function UsageBar() {
-  const { isWhitelisted, credential } = useAuthStore();
+  const { isWhitelisted, trial, credential } = useAuthStore();
   const [usage, setUsage] = useState<UsageData | null>(null);
+
+  // Whitelisted testers and trial users (clock started) may see usage.
+  const canSeeUsage = !!credential && (isWhitelisted || trial?.startedAt != null);
 
   const fetchUsage = useCallback(async () => {
     if (!credential) return;
@@ -31,14 +34,14 @@ export default function UsageBar() {
   }, [credential]);
 
   useEffect(() => {
-    if (!isWhitelisted || !credential) return;
+    if (!canSeeUsage) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- fetching usage data from external API is a valid effect
     void fetchUsage();
     const id = setInterval(() => void fetchUsage(), 60_000);
     return () => clearInterval(id);
-  }, [isWhitelisted, credential, fetchUsage]);
+  }, [canSeeUsage, fetchUsage]);
 
-  if (!isWhitelisted || !credential || !usage) return null;
+  if (!canSeeUsage || !usage) return null;
 
   const personalPct = Math.min((usage.personal.cost / MONTHLY_BUDGET) * 100, 100);
   const totalPct = Math.min((usage.total.cost / MONTHLY_BUDGET) * 100, 100);

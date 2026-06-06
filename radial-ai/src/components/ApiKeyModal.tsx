@@ -1,7 +1,15 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useCanvasStore } from '../store/canvasStore';
 import { getModelProvider } from '../store/canvasStore';
-import { useAuthStore, hasDevKeyAccess } from '../store/authStore';
+import { useAuthStore, hasDevKeyAccess, isTrialEligible, activateTrial, formatTrialExpiry } from '../store/authStore';
+
+const MONTHLY_BUDGET = 5.0;
+
+function fmtCost(n: number): string {
+  if (n === 0) return '$0.000';
+  if (n < 0.001) return '<$0.001';
+  return `$${n.toFixed(3)}`;
+}
 
 const MODEL_GROUPS = [
   {
@@ -29,15 +37,62 @@ const MODEL_GROUPS = [
 const DEV_GEMINI_KEY = import.meta.env.VITE_GOOGLE_API_KEY as string | undefined;
 const DEV_MODE_AVAILABLE = !!DEV_GEMINI_KEY && DEV_GEMINI_KEY !== 'your_gemini_api_key_here';
 
+// Server-side locks dev-key routing (whitelist + free trial) to this single model.
+export const LOCKED_MODEL = 'gemini-3.1-flash-lite-preview';
+
 export default function ApiKeyModal({ onClose }: { onClose: () => void }) {
   const { apiKey, geminiApiKey, model, setApiKey, setGeminiApiKey, setModel, theme } = useCanvasStore();
-  const { isWhitelisted, trial, devMode, setDevMode } = useAuthStore();
+  const { isWhitelisted, trial, devMode, setDevMode, credential, setTrial } = useAuthStore();
   const canUseDevKey = hasDevKeyAccess({ isWhitelisted, trial });
   const trialActive = !isWhitelisted && !!trial?.active;
+  const trialExpired = !isWhitelisted && !!trial && trial.startedAt != null && !trial.active;
+  const eligible = isTrialEligible({ isWhitelisted, trial });
+  // Trial users see "免費試用 / Free Trial"; whitelisted testers see "開發者模式".
+  const accessLabel = trialActive ? '免費試用' : 'Developer Mode';
+  const lockedActive = devMode && canUseDevKey;  // routing through the locked dev key
   const [anthropicInput, setAnthropicInput] = useState(apiKey);
   const [geminiInput, setGeminiInput] = useState(geminiApiKey);
   const [selectedModel, setSelectedModel] = useState(model);
   const [devModeActive, setDevModeActive] = useState(false);
+  const [personalCost, setPersonalCost] = useState<number | null>(null);
+  const [activating, setActivating] = useState(false);
+
+  // Fetch this user's usage when they have (or had) dev-key access.
+  const canSeeUsage = !!credential && (isWhitelisted || (trial?.startedAt != null));
+  useEffect(() => {
+    if (!canSeeUsage) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await fetch('/api/usage', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ credential }),
+        });
+        if (r.ok && !cancelled) {
+          const data = await r.json() as { personal?: { cost?: number } };
+          setPersonalCost(data.personal?.cost ?? 0);
+        }
+      } catch { /* ignore */ }
+    })();
+    return () => { cancelled = true; };
+  }, [canSeeUsage, credential]);
+
+  // While routing through the locked dev key, the only usable model is the
+  // server-locked one — reflect that in the selector so the UI never lies.
+  useEffect(() => {
+    if (lockedActive && selectedModel !== LOCKED_MODEL) setSelectedModel(LOCKED_MODEL);
+  }, [lockedActive, selectedModel]);
+
+  const handleActivateTrial = async () => {
+    if (!credential) return;
+    setActivating(true);
+    const t = await activateTrial(credential);
+    setActivating(false);
+    setTrial(t);
+    setModel(LOCKED_MODEL);
+    if (t?.active) setDevMode(true);
+  };
 
   const activeProvider = getModelProvider(selectedModel);
   const isDark = theme === 'dark';
@@ -158,13 +213,13 @@ export default function ApiKeyModal({ onClose }: { onClose: () => void }) {
                   <div className="grid grid-cols-2 gap-1.5">
                     {group.models.filter(m => !m.devOnly || DEV_MODE_AVAILABLE).map((m) => {
                       const active = selectedModel === m.id;
-                      const lockedOut = devMode && canUseDevKey && m.id !== 'gemini-3.1-flash-lite-preview';
+                      const lockedOut = lockedActive && m.id !== LOCKED_MODEL;
                       return (
                         <button
                           key={m.id}
                           onClick={() => !lockedOut && setSelectedModel(m.id)}
                           disabled={lockedOut}
-                          title={lockedOut ? '開發者模式已鎖定此模型' : (m as { recommended?: boolean }).recommended ? 'Recommended' : undefined}
+                          title={lockedOut ? `${accessLabel}已鎖定此模型（僅限 Gemini Flash Lite）` : (m as { recommended?: boolean }).recommended ? 'Recommended' : undefined}
                           className="text-left text-xs px-3 py-2 rounded-xl transition-all font-medium flex items-center gap-1"
                           style={lockedOut
                             ? { ...inactiveModelStyle, opacity: 0.35, cursor: 'not-allowed' }
@@ -186,12 +241,15 @@ export default function ApiKeyModal({ onClose }: { onClose: () => void }) {
 
           {/* API Keys */}
           <div className="space-y-2.5 mb-5">
-            {devMode && canUseDevKey ? (
-              /* Dev mode: show a single locked placeholder row */
+            {lockedActive ? (
+              /* Dev-key routing: show a single locked placeholder row */
               <div className="rounded-xl p-3" style={{ background: 'var(--bg-inactive)', border: '1.5px solid var(--border-inactive)', opacity: 0.7 }}>
                 <div className="flex items-center gap-2 mb-2">
                   <span className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>API Key</span>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded-full font-semibold text-white" style={{ background: '#f59e0b' }}>開發者模式</span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full font-semibold text-white"
+                    style={{ background: trialActive ? 'linear-gradient(90deg,#f472b6,#f59e0b)' : '#f59e0b' }}>
+                    {trialActive ? '免費試用' : '開發者模式'}
+                  </span>
                 </div>
                 <input
                   type="password"
@@ -202,7 +260,9 @@ export default function ApiKeyModal({ onClose }: { onClose: () => void }) {
                   style={{ ...inputStyle, opacity: 0.6 }}
                 />
                 <p className="text-[10px] mt-1.5" style={{ color: 'var(--text-faint)' }}>
-                  🔒 使用開發者提供的 API Key，無法修改
+                  🔒 {trialActive
+                    ? '免費試用使用內建金鑰，模型鎖定為 Gemini Flash Lite'
+                    : '使用開發者提供的 API Key，無法修改'}
                 </p>
               </div>
             ) : (
@@ -278,14 +338,17 @@ export default function ApiKeyModal({ onClose }: { onClose: () => void }) {
           {/* Whitelist / Trial Dev Mode toggle */}
           <div style={{ borderTop: '1px solid var(--border-base)', paddingTop: 12 }}>
             {canUseDevKey ? (
-              /* Toggle row */
+              <>
+              {/* Toggle row */}
               <div className="flex items-center justify-between px-1">
                 <div>
                   <p className="text-xs font-semibold" style={{ color: isDark ? '#fbbf24' : '#92400e' }}>
                     {trialActive ? `免費試用中 · 剩 ${trial?.daysLeft} 天` : 'Developer Mode'}
                   </p>
                   <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-faint)' }}>
-                    {devMode ? '使用開發者 API Key（模型已鎖定）' : '使用你自己的 API Key'}
+                    {devMode
+                      ? (trialActive ? '免費試用金鑰 · 鎖定 Gemini Flash Lite' : '使用開發者 API Key（模型已鎖定）')
+                      : '使用你自己的 API Key'}
                   </p>
                 </div>
                 {/* Toggle switch */}
@@ -293,7 +356,7 @@ export default function ApiKeyModal({ onClose }: { onClose: () => void }) {
                   onClick={() => setDevMode(!devMode)}
                   className="relative flex-shrink-0 w-10 h-5 rounded-full transition-all"
                   style={{ background: devMode ? '#f59e0b' : 'var(--bg-inactive)', border: '1.5px solid', borderColor: devMode ? '#f59e0b' : 'var(--border-inactive)' }}
-                  title={devMode ? '關閉 Developer Mode' : '開啟 Developer Mode'}
+                  title={devMode ? `關閉${accessLabel}` : `開啟${accessLabel}`}
                 >
                   <span
                     className="absolute top-0.5 w-3.5 h-3.5 rounded-full transition-all"
@@ -301,8 +364,69 @@ export default function ApiKeyModal({ onClose }: { onClose: () => void }) {
                   />
                 </button>
               </div>
+              {/* Trial expiry + usage */}
+              {(trialActive || personalCost != null) && (
+                <div className="mt-2 px-1 space-y-1">
+                  {trialActive && (
+                    <div className="flex items-center justify-between text-[10px]">
+                      <span style={{ color: 'var(--text-faint)' }}>免費試用到期</span>
+                      <span className="tabular-nums" style={{ color: 'var(--text-muted)' }}>
+                        {formatTrialExpiry(trial?.expiresAt ?? null)}
+                      </span>
+                    </div>
+                  )}
+                  {personalCost != null && (
+                    <div className="flex items-center justify-between text-[10px]">
+                      <span style={{ color: 'var(--text-faint)' }}>我的用量（本月）</span>
+                      <span className="tabular-nums" style={{ color: 'var(--text-muted)' }}>
+                        {fmtCost(personalCost)} / ${MONTHLY_BUDGET}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+              </>
+            ) : eligible ? (
+              /* Declined earlier (or KV-restored) — let them start the trial now */
+              <div className="px-1">
+                <p className="text-xs font-semibold mb-1.5" style={{ color: isDark ? '#fbbf24' : '#92400e' }}>
+                  🎁 三天免費試用
+                </p>
+                <p className="text-[10px] mb-2" style={{ color: 'var(--text-faint)' }}>
+                  啟用開發者 API Key，免費試用 3 天，無需自備金鑰。
+                </p>
+                <button
+                  onClick={handleActivateTrial}
+                  disabled={activating}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold text-white transition-all hover:opacity-90"
+                  style={{ background: 'linear-gradient(90deg,#f472b6,#60a5fa)', opacity: activating ? 0.6 : 1 }}
+                >
+                  {activating ? '啟用中…' : '啟用免費試用'}
+                </button>
+              </div>
+            ) : trialExpired ? (
+              /* Trial used up */
+              <div className="px-1 space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs" style={{ color: 'var(--text-faint)' }}>Developer Mode</span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: 'var(--bg-inactive)', color: 'var(--text-faint)', border: '1px solid var(--border-inactive)' }}>
+                    免費試用已結束
+                  </span>
+                </div>
+                <p className="text-[10px]" style={{ color: 'var(--text-faint)' }}>
+                  試用已於 {formatTrialExpiry(trial?.expiresAt ?? null)} 到期。請改用自己的 API Key。
+                </p>
+                {personalCost != null && (
+                  <div className="flex items-center justify-between text-[10px]">
+                    <span style={{ color: 'var(--text-faint)' }}>試用期間用量（本月）</span>
+                    <span className="tabular-nums" style={{ color: 'var(--text-muted)' }}>
+                      {fmtCost(personalCost)} / ${MONTHLY_BUDGET}
+                    </span>
+                  </div>
+                )}
+              </div>
             ) : (
-              /* Non-whitelisted: show hint */
+              /* Non-whitelisted, no trial context: show hint */
               <div className="flex items-center gap-2 px-1 opacity-50 select-none" title="僅限白名單測試人員使用">
                 <span className="text-xs" style={{ color: 'var(--text-faint)' }}>Developer Mode</span>
                 <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: 'var(--bg-inactive)', color: 'var(--text-faint)', border: '1px solid var(--border-inactive)' }}>

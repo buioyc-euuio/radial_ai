@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { GoogleLogin, type CredentialResponse } from '@react-oauth/google';
 import { useCanvasStore } from '../store/canvasStore';
-import { useAuthStore, type GoogleUser, type TrialStatus } from '../store/authStore';
-import ApiKeyModal from './ApiKeyModal';
+import { useAuthStore, activateTrial, type GoogleUser, type TrialStatus } from '../store/authStore';
+import ApiKeyModal, { LOCKED_MODEL } from './ApiKeyModal';
 import UsageBar from './UsageBar';
 import { getModelProvider } from '../store/canvasStore';
 import logo from '../assets/logo-transparent.png';
@@ -30,6 +30,7 @@ export async function fetchAccessStatus(
     return { isWhitelisted: data.isWhitelisted ?? false, trial: data.trial ?? null };
   } catch { return { isWhitelisted: false, trial: null }; }
 }
+
 
 function GoogleLoginBtn({ onLogin }: { onLogin: (u: GoogleUser, credential: string) => void }) {
   const handleCredential = (credentialResponse: CredentialResponse) => {
@@ -199,16 +200,42 @@ function WhitelistDebugToggle() {
 }
 
 export default function HomePage() {
-  const { projects, createProject, openProject, deleteProject, renameProject, apiKey, geminiApiKey, model, theme, toggleTheme } = useCanvasStore();
-  const { user, login, logout, isWhitelisted, setWhitelisted, trial, setTrial, setDevMode } = useAuthStore();
+  const { projects, createProject, openProject, deleteProject, renameProject, apiKey, geminiApiKey, model, setModel, theme, toggleTheme } = useCanvasStore();
+  const { user, login, logout, isWhitelisted, setWhitelisted, trial, setTrial, setDevMode,
+    credential, trialPromptDismissed, setTrialPromptDismissed } = useAuthStore();
+  const [showTrialOptIn, setShowTrialOptIn] = useState(false);
+  const [activating, setActivating] = useState(false);
 
   const handleLogin = async (u: GoogleUser, credential: string) => {
     login(u, credential);
     const { isWhitelisted: wl, trial: t } = await fetchAccessStatus(credential);
     setWhitelisted(wl);
     setTrial(t);
-    // Auto-enable dev-key routing during an active trial so it works out of the box.
-    if (!wl && t?.active) setDevMode(true);
+    if (wl) return;
+    if (t?.active) {
+      // Returning mid-trial: resume dev-key routing (model locked to Flash Lite).
+      setDevMode(true);
+      setModel(LOCKED_MODEL);
+    } else if ((!t || t.startedAt == null) && !trialPromptDismissed) {
+      // Eligible but never activated → ask whether to start the free trial.
+      setShowTrialOptIn(true);
+    }
+  };
+
+  const handleAcceptTrial = async () => {
+    if (!credential) { setShowTrialOptIn(false); return; }
+    setActivating(true);
+    const t = await activateTrial(credential);
+    setActivating(false);
+    setTrial(t);
+    if (t?.active) { setDevMode(true); setModel(LOCKED_MODEL); }
+    setTrialPromptDismissed(true);
+    setShowTrialOptIn(false);
+  };
+
+  const handleDeclineTrial = () => {
+    setTrialPromptDismissed(true);
+    setShowTrialOptIn(false);
   };
 
   const trialActive = !isWhitelisted && !!trial?.active;
@@ -560,6 +587,54 @@ export default function HomePage() {
                   className="px-5 py-2 text-sm text-white font-semibold rounded-xl transition-all hover:opacity-90"
                   style={{ background: 'linear-gradient(90deg,#f87171,#fb923c)', boxShadow: '0 2px 12px rgba(248,113,113,0.3)' }}>
                   Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* First-login free-trial opt-in */}
+      {showTrialOptIn && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: modalBackdrop, backdropFilter: 'blur(12px)' }}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl overflow-hidden"
+            style={{ background: 'var(--bg-base)', border: '1.5px solid var(--border-base)', boxShadow: '0 24px 80px var(--shadow-lg)' }}
+          >
+            <div className="h-1" style={{ background: 'linear-gradient(90deg,#f472b6,#a78bfa,#60a5fa)' }} />
+            <div className="p-6">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-lg">🎁</span>
+                <h2 className="font-bold text-base"
+                  style={{ background: 'linear-gradient(90deg,#ec4899,#3b82f6)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                  是否啟用三天免費試用版本？
+                </h2>
+              </div>
+              <p className="text-xs mb-5 leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                啟用後即可<b>免費試用開發者 API Key 3 天</b>，無需自備金鑰。
+                時間從你按下「啟用」的當下開始計算，到期後會自動停用。
+                你隨時可以在右上角 ⚙ 設定中查看用量與到期時間。
+              </p>
+              <div className="flex justify-end gap-2">
+                <button
+                  onClick={handleDeclineTrial}
+                  disabled={activating}
+                  className="px-4 py-2 text-sm rounded-xl transition-colors"
+                  style={{ color: 'var(--text-muted)' }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--bg-subtle)'; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+                >
+                  否，使用自己的金鑰
+                </button>
+                <button
+                  onClick={handleAcceptTrial}
+                  disabled={activating}
+                  className="px-5 py-2 text-sm text-white font-semibold rounded-xl transition-all hover:opacity-90"
+                  style={{ background: 'linear-gradient(90deg,#f472b6,#60a5fa)', boxShadow: '0 2px 12px rgba(244,114,182,0.3)', opacity: activating ? 0.6 : 1 }}
+                >
+                  {activating ? '啟用中…' : '是，啟用免費試用'}
                 </button>
               </div>
             </div>

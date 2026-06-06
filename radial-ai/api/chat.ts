@@ -44,9 +44,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!email) return res.status(401).json({ error: '登入已過期，請重新登入', code: 'AUTH_EXPIRED' });
 
   // Access to the developer key is granted to whitelisted users OR anyone
-  // within their 3-day free trial (the clock is established on first login).
+  // within an active 3-day free trial. The trial clock is only started via the
+  // explicit opt-in (/api/activate-trial), never silently here.
   const whitelisted = await checkWhitelisted(email);
-  const trialActive = whitelisted || (await getTrialStatus(email, { establish: true })).active;
+  const trialActive = whitelisted || (await getTrialStatus(email)).active;
   if (!whitelisted && !trialActive) {
     return res.status(403).json({ error: '免費試用已結束，且不在白名單中', code: 'NO_ACCESS' });
   }
