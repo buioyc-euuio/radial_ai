@@ -53,7 +53,8 @@ export default function GlobalInputPalette() {
   const [input, setInput] = useState('');
   const [error, setError] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const { contextCapsules, removeContextCapsule, sendPrompt, historyScope, setHistoryScope, commitOriginalText } = useCanvasStore();
+  const { contextCapsules, removeContextCapsule, sendPrompt, historyScope, setHistoryScope, commitOriginalText, inputMode, setInputMode } = useCanvasStore();
+  const isRaw = inputMode === 'raw';
 
   const [rect, setRect] = useState<Rect>(loadRect);
   const rectRef = useRef(rect);
@@ -135,9 +136,11 @@ export default function GlobalInputPalette() {
   const handleSend = async () => {
     if (!input.trim()) return;
     setError('');
-    const prompt = input.trim();
+    const text = input.trim();
     setInput('');
-    try { await sendPrompt(prompt); }
+    // 原文模式: store verbatim, no AI. 問答模式: send to the model.
+    if (isRaw) { commitOriginalText(text); return; }
+    try { await sendPrompt(text); }
     catch (err) { setError(err instanceof Error ? err.message : 'An error occurred'); }
   };
 
@@ -146,15 +149,6 @@ export default function GlobalInputPalette() {
       e.preventDefault();
       handleSend();
     }
-  };
-
-  // Save the textarea text straight into a node as raw original text (no AI call).
-  const handlePasteOriginal = () => {
-    const text = input.trim();
-    if (!text) { setError('請先在下方輸入框貼上原文'); textareaRef.current?.focus(); return; }
-    setError('');
-    commitOriginalText(text);
-    setInput('');
   };
 
   return (
@@ -254,12 +248,16 @@ export default function GlobalInputPalette() {
             </span>
           )}
           <button
-            onClick={handlePasteOriginal}
-            title="把下方輸入框的文字直接存成節點（不呼叫 AI，省 API）"
+            onClick={() => setInputMode(isRaw ? 'qa' : 'raw')}
+            title={isRaw
+              ? '原文模式（不呼叫 AI，Send 直接存為「答」）— 點擊切回問答模式'
+              : '切換到原文模式：輸入內容不經過 AI，直接存成節點的「答」'}
             className="ml-auto flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full transition-all whitespace-nowrap flex-shrink-0"
-            style={{ color: '#be185d', border: '1px solid rgba(244,114,182,0.4)', background: 'linear-gradient(135deg,rgba(244,114,182,0.12),rgba(96,165,250,0.12))', fontWeight: 600 }}
+            style={isRaw
+              ? { color: 'white', border: '1px solid transparent', background: 'linear-gradient(135deg,#f59e0b,#f472b6)', fontWeight: 700 }
+              : { color: '#be185d', border: '1px solid rgba(244,114,182,0.4)', background: 'linear-gradient(135deg,rgba(244,114,182,0.12),rgba(96,165,250,0.12))', fontWeight: 600 }}
           >
-            <span>📋</span><span className="hidden sm:inline">貼上原文</span>
+            <span>📋</span><span className="hidden sm:inline">{isRaw ? '原文模式 ✓' : '貼上原文'}</span>
           </button>
         </div>
 
@@ -270,20 +268,25 @@ export default function GlobalInputPalette() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Ask anything… Enter to send · Shift+Enter for newline · ⌘/ to focus"
+            placeholder={isRaw
+              ? '原文模式：貼上其他 AI 的回答原文，按 Send 直接存為「答」（不呼叫 AI）· Shift+Enter 換行'
+              : 'Ask anything… Enter to send · Shift+Enter for newline · ⌘/ to focus'}
             className="flex-1 h-full bg-transparent text-sm resize-none outline-none placeholder-pink-200"
             style={{ lineHeight: '1.5rem', color: 'var(--text-body)' }}
           />
           <button
             onClick={handleSend}
             disabled={!input.trim()}
+            title={isRaw ? '存為原文（不呼叫 AI）' : '送出給 AI'}
             className="flex-shrink-0 text-sm font-semibold px-5 py-2 rounded-xl transition-all"
-            style={input.trim()
-              ? { background: 'linear-gradient(90deg,#f472b6,#60a5fa)', color: 'white', boxShadow: '0 2px 12px rgba(244,114,182,0.3)' }
-              : { background: 'var(--bg-inactive)', color: 'var(--text-faint)', cursor: 'not-allowed' }
+            style={!input.trim()
+              ? { background: 'var(--bg-inactive)', color: 'var(--text-faint)', cursor: 'not-allowed' }
+              : isRaw
+                ? { background: 'linear-gradient(90deg,#f59e0b,#f472b6)', color: 'white', boxShadow: '0 2px 12px rgba(245,158,11,0.3)' }
+                : { background: 'linear-gradient(90deg,#f472b6,#60a5fa)', color: 'white', boxShadow: '0 2px 12px rgba(244,114,182,0.3)' }
             }
           >
-            Send
+            {isRaw ? '存原文' : 'Send'}
           </button>
         </div>
 

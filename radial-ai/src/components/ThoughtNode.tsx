@@ -4,9 +4,34 @@ import type { ThoughtNodeData } from '../store/types';
 import { useCanvasStore } from '../store/canvasStore';
 import { computeNodeNumbers } from '../utils/nodeNumbers';
 
+// ── Read-status indicator (header bullet → toggle button) ─────────────────────
+const STATUS_META = {
+  unread: { label: '未讀', next: '已閱' },
+  read: { label: '已閱', next: '重要' },
+  important: { label: '重要', next: '未讀' },
+} as const;
+
+function StatusIndicator({ status }: { status: 'unread' | 'read' | 'important' }) {
+  if (status === 'read') {
+    return (
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+        <polyline points="20 6 9 17 4 12" />
+      </svg>
+    );
+  }
+  if (status === 'important') {
+    return (
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="#f59e0b" stroke="#f59e0b" strokeWidth="1" strokeLinejoin="round">
+        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+      </svg>
+    );
+  }
+  return <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'linear-gradient(135deg,#f472b6,#60a5fa)' }} />;
+}
+
 function ThoughtNode({ id, data }: NodeProps) {
   const nodeData = data as ThoughtNodeData;
-  const { selectedNodeId, deleteNode, nodes, replayRevealed } = useCanvasStore();
+  const { selectedNodeId, deleteNode, nodes, replayRevealed, cycleNodeStatus } = useCanvasStore();
   const isSelected = selectedNodeId === id;
   const dimmed = Array.isArray(replayRevealed) && !replayRevealed.includes(id);
 
@@ -18,12 +43,10 @@ function ThoughtNode({ id, data }: NodeProps) {
   if (nodeData.type !== 'thoughtNode') return null;
 
   const isBlank = !nodeData.prompt && !nodeData.response && !nodeData.isLoading;
-  // Manual ("貼上原文") nodes have prompt "無", so preview their response instead.
-  const preview = nodeData.manual
-    ? (nodeData.response || nodeData.prompt || '')
-    : (nodeData.prompt || nodeData.response || '');
-  const displayText = nodeData.title
-    ?? (preview.length > 55 ? preview.slice(0, 55) + '…' : preview);
+  const status = nodeData.readStatus ?? 'unread';
+  // Header: "#N-title" (title comes from the free Gemini namer or a manual edit
+  // in the reading panel — both write nodeData.title, so this stays in sync).
+  const headerLabel = `#${nodeNum}${nodeData.title ? `-${nodeData.title}` : ''}`;
 
   // Handles are invisible — FloatingEdge computes its own border-point endpoints
   const handleStyle = { opacity: 0, width: 8, height: 8 };
@@ -57,19 +80,26 @@ function ThoughtNode({ id, data }: NodeProps) {
           borderBottom: '1px solid var(--border-base)',
         }}
       >
-        <div className="flex items-center gap-1.5">
-          <div className="w-1.5 h-1.5 rounded-full" style={{ background: 'linear-gradient(135deg,#f472b6,#60a5fa)' }} />
+        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+          <button
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => { e.stopPropagation(); cycleNodeStatus(id); }}
+            title={`閱讀狀態：${STATUS_META[status].label}（點擊改為「${STATUS_META[status].next}」）`}
+            className="w-4 h-4 flex items-center justify-center rounded-full transition-colors flex-shrink-0 hover:bg-black/10"
+          >
+            <StatusIndicator status={status} />
+          </button>
           <span
-            className="text-[10px] font-bold tracking-wide"
+            className="text-[10px] font-bold tracking-wide truncate"
             style={{ background: 'linear-gradient(90deg,#ec4899,#3b82f6)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}
           >
-            Thought {nodeNum ? `#${nodeNum}` : ''}
+            {headerLabel}
           </span>
         </div>
         <button
           onPointerDown={(e) => { e.stopPropagation(); }}
           onClick={(e) => { e.stopPropagation(); deleteNode(id); }}
-          className="text-gray-300 hover:text-red-400 text-xs w-4 h-4 flex items-center justify-center rounded transition-colors"
+          className="text-gray-300 hover:text-red-400 text-xs w-4 h-4 flex items-center justify-center rounded transition-colors flex-shrink-0 ml-1"
           title="Delete node"
         >
           ✕
@@ -88,10 +118,15 @@ function ThoughtNode({ id, data }: NodeProps) {
           </div>
         ) : isBlank ? (
           <p className="text-xs italic leading-relaxed m-0" style={{ color: 'var(--text-placeholder)' }}>
-            空白節點 · 在下方輸入問題開始
+            空白節點 · 點我貼上原文，或在下方提問
           </p>
         ) : (
-          <p className="text-xs text-gray-600 leading-relaxed m-0">{displayText}</p>
+          <p
+            className="text-xs text-gray-600 leading-relaxed m-0"
+            style={{ display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: 3, overflow: 'hidden' }}
+          >
+            {nodeData.prompt}
+          </p>
         )}
       </div>
 

@@ -1,5 +1,6 @@
 import type { Node, Edge } from '@xyflow/react';
 import type { NodeData, ThoughtNodeData } from '../store/types';
+import { isThoughtNode } from './nodeTypeGuards';
 
 // Versioned envelope written by JSON export — lets another Radial AI (or a future
 // version) recognise and re-import a canvas losslessly.
@@ -54,12 +55,12 @@ function chrono(a: Node<NodeData>, b: Node<NodeData>): number {
 /** Human/LLM-readable Markdown transcript of every thought on the canvas. */
 export function buildCanvasMarkdown(name: string, nodes: Node<NodeData>[]): string {
   const thoughts = nodes
-    .filter(n => n.data.type === 'thoughtNode' && !(n.data as ThoughtNodeData).isDeleted)
+    .filter((n): n is Node<ThoughtNodeData> => isThoughtNode(n) && !n.data.isDeleted)
     .sort(chrono);
 
   const out: string[] = [`# ${name}`, '', '> Exported from Radial AI', ''];
   thoughts.forEach((n, i) => {
-    const d = n.data as ThoughtNodeData;
+    const d = n.data;
     out.push(`## ${i + 1}. ${d.title || `Thought ${i + 1}`}`, '');
     if (d.references?.length) {
       out.push('**引用 References:**', '');

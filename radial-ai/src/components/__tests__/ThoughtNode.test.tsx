@@ -11,10 +11,14 @@ vi.mock('@xyflow/react', () => ({
 const mockDeleteNode = vi.fn()
 let mockSelectedId: string | null = null
 
+const mockCycleStatus = vi.fn()
+
 vi.mock('../../store/canvasStore', () => ({
   useCanvasStore: () => ({
     get selectedNodeId() { return mockSelectedId },
     deleteNode: mockDeleteNode,
+    cycleNodeStatus: mockCycleStatus,
+    replayRevealed: null,
     nodes: [],
     edges: [],
   }),
@@ -29,7 +33,7 @@ beforeEach(() => {
 })
 
 describe('ThoughtNode display', () => {
-  it('shows AI-generated title when available', () => {
+  it('shows the AI-generated title in the #N-title header', () => {
     renderNode('n1', {
       type: 'thoughtNode',
       prompt: 'What is quantum computing?',
@@ -38,10 +42,11 @@ describe('ThoughtNode display', () => {
       isLoading: false,
       isCollapsed: false,
     })
-    expect(screen.getByText('Quantum Computing Explained')).toBeInTheDocument()
+    // Header is "#<n>-<title>", so match the title as a substring.
+    expect(screen.getByText(/Quantum Computing Explained/)).toBeInTheDocument()
   })
 
-  it('does not show prompt text when title is set', () => {
+  it('shows the prompt in the body even when a title is set (title lives in the header)', () => {
     renderNode('n1', {
       type: 'thoughtNode',
       prompt: 'What is quantum computing?',
@@ -50,10 +55,10 @@ describe('ThoughtNode display', () => {
       isLoading: false,
       isCollapsed: false,
     })
-    expect(screen.queryByText('What is quantum computing?')).not.toBeInTheDocument()
+    expect(screen.getByText('What is quantum computing?')).toBeInTheDocument()
   })
 
-  it('falls back to prompt text when no title', () => {
+  it('shows the prompt in the body when there is no title', () => {
     renderNode('n1', {
       type: 'thoughtNode',
       prompt: 'Short question',
@@ -64,7 +69,7 @@ describe('ThoughtNode display', () => {
     expect(screen.getByText('Short question')).toBeInTheDocument()
   })
 
-  it('truncates prompt fallback at 55 chars with ellipsis', () => {
+  it('renders the full prompt in the body (clamped to 3 lines via CSS, not truncated text)', () => {
     const longPrompt = 'A'.repeat(60)
     renderNode('n1', {
       type: 'thoughtNode',
@@ -73,7 +78,7 @@ describe('ThoughtNode display', () => {
       isLoading: false,
       isCollapsed: false,
     })
-    expect(screen.getByText('A'.repeat(55) + '…')).toBeInTheDocument()
+    expect(screen.getByText(longPrompt)).toBeInTheDocument()
   })
 
   it('shows loading spinner when isLoading is true', () => {
@@ -90,6 +95,20 @@ describe('ThoughtNode display', () => {
   it('renders nothing for non-thoughtNode data', () => {
     const { container } = renderNode('n1', { type: 'placeholderNode', isDeleted: true })
     expect(container.firstChild).toBeNull()
+  })
+})
+
+describe('ThoughtNode read-status toggle', () => {
+  it('cycles read status when the status indicator is clicked', () => {
+    renderNode('n1', {
+      type: 'thoughtNode',
+      prompt: 'Question',
+      response: 'Answer',
+      isLoading: false,
+      isCollapsed: false,
+    })
+    fireEvent.click(screen.getByTitle(/閱讀狀態/))
+    expect(mockCycleStatus).toHaveBeenCalledWith('n1')
   })
 })
 

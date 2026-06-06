@@ -147,6 +147,14 @@ npm run lint       # ESLint
 - **點空白處取消選取**：回到預設時間軸；預設時間軸節點之間不再以線相連
 - **匯出／匯入**：匯出 JSON（可重新匯入 Radial AI，完整保留）或 Markdown（餵給其他 LLM）；首頁可匯入 JSON 畫布
 - **閱讀面板浮動工具列**：選字工具列會隨捲動跟隨反白文字，點其他地方即消失
+- **節點卡片改版**：標題列改為「#編號-標題」（標題與右側閱讀區同步），下方顯示問題並在超過三行時截斷為「…」
+- **節點閱讀狀態**：點標題前的圓點可切換 未讀（圓點）→ 已閱（✓）→ 重要（★）
+- **問答／原文 雙模式**：輸入框右上的「貼上原文」鈕可切換模式（再點一下切回）。**問答模式** Send → 丟給 Gemini → 回覆顯示在「答」；**原文模式** Send → 不經 AI，輸入內容一字不漏存成「答」。點擊空白節點會自動切到原文模式並聚焦輸入框
+- **重構（提升可擴充性）**：
+  - 起始畫布種子資料 → `src/data/starterProjects.ts`、`Project` 型別 → `store/types.ts`
+  - 上方功能列拆成 `components/CanvasTopBar.tsx`（精簡 `App.tsx`）
+  - 閱讀面板拆出 `components/AnnotationBubble.tsx`、`utils/domMarkUtils.ts`（精簡 `ReadingPanel.tsx`）
+  - 新增 `isThoughtNode` 型別守衛（`utils/nodeTypeGuards.ts`）減少 `as` 強轉型
 
 ### v2（2026-04）
 - **DAG 多父節點匯合**：Shift+Click 多選節點後發送，新節點同時繼承所有父節點的對話脈絡
