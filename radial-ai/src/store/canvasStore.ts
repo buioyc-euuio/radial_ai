@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import {
-  addEdge, applyNodeChanges, applyEdgeChanges,
+  addEdge, reconnectEdge, applyNodeChanges, applyEdgeChanges,
   type Node, type Edge, type NodeChange, type EdgeChange, type Connection,
 } from '@xyflow/react';
 import { v4 as uuidv4 } from 'uuid';
@@ -374,6 +374,16 @@ interface CanvasStore {
   onNodesChange: (changes: NodeChange[]) => void;
   onEdgesChange: (changes: EdgeChange[]) => void;
   onConnect: (connection: Connection) => void;
+  onReconnect: (oldEdge: Edge, newConnection: Connection) => void;
+  removeEdge: (edgeId: string) => void;
+  addBlankNode: (position: { x: number; y: number }) => void;
+  commitOriginalText: (text: string) => void;
+  generateTitleForNode: (nodeId: string) => Promise<void>;
+  retitleAllNodes: () => Promise<void>;
+
+  // Birth-order replay animation (null = inactive; array = ids revealed so far)
+  replayRevealed: string[] | null;
+  setReplayRevealed: (ids: string[] | null) => void;
   addContextCapsule: (capsule: ContextCapsule) => void;
   removeContextCapsule: (id: string) => void;
   clearContextCapsules: () => void;
@@ -590,6 +600,135 @@ async function callAI(
   return callClaudeAPI(anthropicKey, model, messages, systemPrompt);
 }
 
+// ── New-node placement helpers (shared by sendPrompt & commitOriginalText) ────
+
+/**
+ * Decide which existing nodes a new node should descend from.
+ * Priority: 2+ Shift-selected nodes (DAG merge) → context-capsule sources →
+ * the single currently-selected node → none (root on the main timeline).
+ */
+function resolveParentIds(
+  nodes: Node<NodeData>[], contextCapsules: ContextCapsule[], selectedNodeId: string | null,
+): string[] {
+  const selectedThoughtNodes = nodes.filter(n => n.selected && n.data.type === 'thoughtNode');
+  const capsuleSourceIds = [...new Set(contextCapsules.map(c => c.sourceNodeId))].filter(Boolean);
+
+  if (selectedThoughtNodes.length >= 2) {
+    return [...new Set([...selectedThoughtNodes.map(n => n.id), ...capsuleSourceIds])];
+  }
+  if (capsuleSourceIds.length > 0) return capsuleSourceIds;
+  // Single selected node becomes the branch point — "ask from whichever node is selected".
+  if (selectedNodeId) {
+    const sel = nodes.find(n => n.id === selectedNodeId);
+    if (sel?.data.type === 'thoughtNode') return [sel.id];
+  }
+  return [];
+}
+
+/** Compute the new node's position, the edges linking it to its parents, and its DAG ancestors. */
+function buildParentLinkage(
+  nodes: Node<NodeData>[], edges: Edge[], parentIds: string[], newNodeId: string,
+): { position: { x: number; y: number }; parentEdges: Edge[]; ancestors: Node<NodeData>[] } {
+  let position = { x: MAIN_TIMELINE_X, y: 80 };
+  const parentEdges: Edge[] = [];
+
+  if (parentIds.length > 0) {
+    const parentNodes = parentIds
+      .map(id => nodes.find(n => n.id === id))
+      .filter((n): n is Node<NodeData> => !!n);
+    position = calculateOptimalPosition(parentNodes, nodes);
+    for (const parentId of parentIds) {
+      const srcNode = nodes.find(n => n.id === parentId);
+      if (!srcNode) continue;
+      const { sourceHandle, targetHandle } = getEdgeHandles(
+        srcNode.position.x, srcNode.position.y, position.x, position.y,
+      );
+      parentEdges.push({
+        id: `e_${parentId}_${newNodeId}`,
+        source: parentId, target: newNodeId,
+        sourceHandle, targetHandle,
+        type: 'floatingEdge',
+        markerEnd: { type: 'arrowclosed' as const },
+        style: { stroke: '#f472b6' },
+      });
+    }
+  } else {
+    const lastMainNode = getMainTimelineLastNode(nodes, edges);
+    if (lastMainNode) {
+      position = {
+        x: lastMainNode.position.x,
+        y: lastMainNode.position.y + NODE_HEIGHT_ESTIMATE + NODE_VERTICAL_GAP,
+      };
+      parentEdges.push({
+        id: `e_${lastMainNode.id}_${newNodeId}`,
+        source: lastMainNode.id, target: newNodeId,
+        sourceHandle: 'source-bottom', targetHandle: 'target-top',
+        type: 'floatingEdge',
+        markerEnd: { type: 'arrowclosed' as const },
+        style: { stroke: '#f472b6' },
+      });
+    }
+  }
+
+  const effectiveParentIds = parentIds.length > 0
+    ? parentIds
+    : parentEdges.length > 0 ? [parentEdges[0].source] : [];
+  const ancestors = effectiveParentIds.length > 0
+    ? getDAGAncestors(effectiveParentIds, nodes, edges)
+    : [];
+
+  return { position, parentEdges, ancestors };
+}
+
+// ── Auto-title via a free Gemini model (never the paid Anthropic key) ─────────
+const TITLE_MODEL = 'gemini-3.1-flash-lite-preview';
+
+const TITLE_GEN_SYSTEM = `你是「思維節點標題產生器」。會收到使用者的問題、引用的參考片段、以及一段回答內容，請濃縮出一個能精準概括核心主題的標題。
+規則：
+- 只輸出標題本身，不要任何引號、冒號、句號或多餘標點，也不要「標題：」之類的前綴。
+- 盡量精簡：中文約 4–14 字，英文約 2–7 個單字。
+- 使用與內容相同的語言。
+- 聚焦在主題重點，而非泛泛而談。`;
+
+/**
+ * Generate a concise node title from its content using a FREE model. Routing:
+ * a BYOK Gemini key calls Gemini directly; otherwise (free-trial / whitelist)
+ * it goes through the server proxy, which is locked to a free model. The paid
+ * Anthropic key is never used for titling. Returns null on any failure.
+ */
+async function generateNodeTitle(
+  geminiKey: string, prompt: string, refsText: string, response: string,
+): Promise<string | null> {
+  const parts: string[] = [];
+  if (prompt.trim()) parts.push(`【問題】\n${prompt.trim()}`);
+  if (refsText.trim()) parts.push(`【引用片段】\n${refsText.trim().slice(0, 1500)}`);
+  if (response.trim()) parts.push(`【回答】\n${response.trim().slice(0, 2500)}`);
+  if (parts.length === 0) return null;
+  const messages = [{ role: 'user' as const, content: parts.join('\n\n') }];
+
+  try {
+    let raw: string;
+    if (geminiKey) {
+      raw = await callGeminiAPI(geminiKey, TITLE_MODEL, messages, TITLE_GEN_SYSTEM);
+    } else {
+      const authState = useAuthStore.getState();
+      if (!(authState.devMode && hasDevKeyAccess(authState) && authState.credential)) return null;
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ credential: authState.credential, messages, system: TITLE_GEN_SYSTEM }),
+      });
+      if (!res.ok) return null;
+      const data = await res.json() as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
+      raw = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+    }
+    const title = raw.trim().replace(/^["「『]|["」』]$/g, '').replace(/\s+/g, ' ').slice(0, 60);
+    return title || null;
+  } catch {
+    return null; // titling is best-effort; never block the main flow
+  }
+}
+
 // ── Store ────────────────────────────────────────────────────────────────────
 export const useCanvasStore = create<CanvasStore>()(
   persist(
@@ -608,6 +747,7 @@ export const useCanvasStore = create<CanvasStore>()(
       edges: [],
       contextCapsules: [],
       selectedNodeId: null,
+      replayRevealed: null,
       systemPrompt: '',
       personaName: '',
       historyScope: 'ancestry',
@@ -713,6 +853,121 @@ export const useCanvasStore = create<CanvasStore>()(
         const edges = addEdge(connection, state.edges);
         return { edges, ...syncProject(state.projects, state.currentProjectId, state.nodes, edges) };
       }),
+
+      // Drag an edge endpoint onto a different node — rewires the lineage so the
+      // "血親記憶" (ancestral memory) now traces through the new source/target.
+      onReconnect: (oldEdge, newConnection) => set((state) => {
+        const edges = reconnectEdge(oldEdge, newConnection, state.edges);
+        return { edges, ...syncProject(state.projects, state.currentProjectId, state.nodes, edges) };
+      }),
+
+      // Sever a single edge — cuts the ancestral-memory link between two nodes.
+      removeEdge: (edgeId) => set((state) => {
+        const edges = state.edges.filter(e => e.id !== edgeId);
+        return { edges, ...syncProject(state.projects, state.currentProjectId, state.nodes, edges) };
+      }),
+
+      // Create an empty thought node (double-click on blank canvas). It becomes the
+      // selected node so the next prompt branches from it as a fresh starting point.
+      addBlankNode: (position) => set((state) => {
+        const id = uuidv4();
+        const blankNode: Node<ThoughtNodeData> = {
+          id, type: 'thoughtNode', position, selected: true,
+          data: { type: 'thoughtNode', prompt: '', response: '', isLoading: false, isCollapsed: false },
+        };
+        const nodes = [
+          ...state.nodes.map(n => (n.selected ? { ...n, selected: false } : n)),
+          blankNode as Node<NodeData>,
+        ];
+        return {
+          nodes,
+          selectedNodeId: id,
+          ...syncProject(state.projects, state.currentProjectId, nodes, state.edges),
+        };
+      }),
+
+      // Drop user-pasted text (e.g. another LLM's answer) straight into a node —
+      // no AI call. Fills the selected blank node in place, else creates a manual
+      // node wired to the current branch point. Title is generated afterwards.
+      commitOriginalText: (text) => {
+        const trimmed = text.trim();
+        if (!trimmed) return;
+        const { nodes, edges, contextCapsules, selectedNodeId } = get();
+        const sel = selectedNodeId ? nodes.find(n => n.id === selectedNodeId) : undefined;
+        const selData = sel?.data.type === 'thoughtNode' ? (sel.data as ThoughtNodeData) : null;
+        const selIsBlank = !!selData && !selData.prompt && !selData.response;
+
+        let targetId: string;
+        if (sel && selIsBlank) {
+          targetId = sel.id;
+          set((state) => {
+            const newNodes = state.nodes.map(n =>
+              n.id === sel.id && n.data.type === 'thoughtNode'
+                ? { ...n, data: { ...n.data, response: trimmed, manual: true, isLoading: false } }
+                : n
+            );
+            return { nodes: newNodes, ...syncProject(state.projects, state.currentProjectId, newNodes, state.edges) };
+          });
+        } else {
+          const newNodeId = uuidv4();
+          const parentIds = resolveParentIds(nodes, contextCapsules, selectedNodeId);
+          const { position, parentEdges, ancestors } = buildParentLinkage(nodes, edges, parentIds, newNodeId);
+          targetId = newNodeId;
+          const newNode: Node<ThoughtNodeData> = {
+            id: newNodeId, type: 'thoughtNode', position,
+            data: {
+              type: 'thoughtNode', prompt: '', response: trimmed, manual: true,
+              isLoading: false, isCollapsed: false,
+              ancestorIds: ancestors.map(n => n.id),
+              references: contextCapsules.length > 0 ? [...contextCapsules] : undefined,
+            },
+          };
+          set((state) => {
+            const newNodes = [...state.nodes.map(n => ({ ...n, selected: false })), newNode as Node<NodeData>];
+            const newEdges = parentEdges.length > 0 ? [...state.edges, ...parentEdges] : state.edges;
+            return {
+              nodes: newNodes, edges: newEdges,
+              contextCapsules: [], selectedNodeId: newNodeId,
+              ...syncProject(state.projects, state.currentProjectId, newNodes, newEdges),
+            };
+          });
+        }
+        get().generateTitleForNode(targetId);
+      },
+
+      // Title a single node with a separate free-model call (best-effort).
+      generateTitleForNode: async (nodeId) => {
+        const { nodes, geminiApiKey } = get();
+        const node = nodes.find(n => n.id === nodeId);
+        if (!node || node.data.type !== 'thoughtNode') return;
+        const d = node.data as ThoughtNodeData;
+        const refsText = (d.references ?? []).map(r => r.text).join('\n');
+        const title = await generateNodeTitle(geminiApiKey, d.prompt, refsText, d.response);
+        if (!title) return;
+        set((state) => {
+          const newNodes = state.nodes.map(n =>
+            n.id === nodeId && n.data.type === 'thoughtNode'
+              ? { ...n, data: { ...n.data, title } }
+              : n
+          );
+          return { nodes: newNodes, ...syncProject(state.projects, state.currentProjectId, newNodes, state.edges) };
+        });
+      },
+
+      // Re-title every node on the canvas, sequentially (free-tier friendly).
+      retitleAllNodes: async () => {
+        const { nodes, generateTitleForNode } = get();
+        const ids = nodes
+          .filter(n => {
+            if (n.data.type !== 'thoughtNode') return false;
+            const d = n.data as ThoughtNodeData;
+            return !!(d.prompt || d.response) && !d.isLoading;
+          })
+          .map(n => n.id);
+        for (const id of ids) await generateTitleForNode(id);
+      },
+
+      setReplayRevealed: (ids) => set({ replayRevealed: ids }),
 
       addContextCapsule: (capsule) =>
         set((state) => ({ contextCapsules: [...state.contextCapsules, capsule] })),
@@ -832,81 +1087,13 @@ export const useCanvasStore = create<CanvasStore>()(
       },
 
       sendPrompt: async (userInput: string) => {
-        const { nodes, edges, contextCapsules, apiKey, geminiApiKey, model, systemPrompt, historyScope } = get();
+        const { nodes, edges, contextCapsules, apiKey, geminiApiKey, model, systemPrompt, historyScope, selectedNodeId } = get();
 
-        // ── Determine parent node IDs ────────────────────────────────────────
-        // Multi-select (Shift+Click 2+ nodes) takes priority over capsule sources.
-        const selectedThoughtNodes = nodes.filter(
-          n => n.selected && n.data.type === 'thoughtNode'
-        );
-        const capsuleSourceIds = [...new Set(contextCapsules.map(c => c.sourceNodeId))].filter(Boolean);
-
-        let parentIds: string[];
-        if (selectedThoughtNodes.length >= 2) {
-          // DAG convergence: merge all selected nodes + any capsule sources
-          parentIds = [...new Set([...selectedThoughtNodes.map(n => n.id), ...capsuleSourceIds])];
-        } else if (capsuleSourceIds.length > 0) {
-          // Classic branch: capsule source nodes determine parenthood
-          parentIds = capsuleSourceIds;
-        } else {
-          parentIds = [];
-        }
-
+        // ── Determine parenthood, placement & ancestry (see shared helpers) ──
         const newNodeId = uuidv4();
-        let newPosition = { x: MAIN_TIMELINE_X, y: 80 };
-        const parentEdges: Edge[] = [];
-
-        if (parentIds.length > 0) {
-          const parentNodes = parentIds
-            .map(id => nodes.find(n => n.id === id))
-            .filter((n): n is Node<NodeData> => !!n);
-
-          // Use auto-layout to find the best collision-free position
-          newPosition = calculateOptimalPosition(parentNodes, nodes);
-
-          // One floating edge per parent
-          for (const parentId of parentIds) {
-            const srcNode = nodes.find(n => n.id === parentId);
-            if (!srcNode) continue;
-            const { sourceHandle, targetHandle } = getEdgeHandles(
-              srcNode.position.x, srcNode.position.y, newPosition.x, newPosition.y
-            );
-            parentEdges.push({
-              id: `e_${parentId}_${newNodeId}`,
-              source: parentId, target: newNodeId,
-              sourceHandle, targetHandle,
-              type: 'floatingEdge',
-              markerEnd: { type: 'arrowclosed' as const },
-              style: { stroke: '#f472b6' },
-            });
-          }
-        } else {
-          // No parents → append on main vertical timeline
-          const lastMainNode = getMainTimelineLastNode(nodes, edges);
-          if (lastMainNode) {
-            newPosition = {
-              x: lastMainNode.position.x,
-              y: lastMainNode.position.y + NODE_HEIGHT_ESTIMATE + NODE_VERTICAL_GAP,
-            };
-            parentEdges.push({
-              id: `e_${lastMainNode.id}_${newNodeId}`,
-              source: lastMainNode.id, target: newNodeId,
-              sourceHandle: 'source-bottom', targetHandle: 'target-top',
-              type: 'floatingEdge',
-              markerEnd: { type: 'arrowclosed' as const },
-              style: { stroke: '#f472b6' },
-            });
-          }
-        }
-
-        // ── Build deduplicated DAG conversation history ───────────────────────
-        const effectiveParentIds = parentIds.length > 0
-          ? parentIds
-          : parentEdges.length > 0 ? [parentEdges[0].source] : [];
-
-        const ancestors = effectiveParentIds.length > 0
-          ? getDAGAncestors(effectiveParentIds, nodes, edges)
-          : [];
+        const parentIds = resolveParentIds(nodes, contextCapsules, selectedNodeId);
+        const { position: newPosition, parentEdges, ancestors } =
+          buildParentLinkage(nodes, edges, parentIds, newNodeId);
 
         const newNode: Node<ThoughtNodeData> = {
           id: newNodeId, type: 'thoughtNode', position: newPosition,
@@ -973,6 +1160,8 @@ export const useCanvasStore = create<CanvasStore>()(
             );
             return { nodes: updatedNodes, ...syncProject(state.projects, state.currentProjectId, updatedNodes, state.edges) };
           });
+          // Best-effort: refine the title with a separate free Gemini call (never blocks).
+          get().generateTitleForNode(newNodeId);
         } catch (err) {
           const errorMsg = err instanceof Error ? err.message : 'Unknown error';
           set((state) => {

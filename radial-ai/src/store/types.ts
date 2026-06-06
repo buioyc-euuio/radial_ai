@@ -31,6 +31,7 @@ export interface ThoughtNodeData extends Record<string, unknown> {
   isLoading?: boolean;
   isCollapsed?: boolean;
   isDeleted?: boolean;
+  manual?: boolean;             // content pasted by the user (no AI call)
   markedHtml?: string;          // response HTML with Range-based marks embedded
   highlights?: string[];        // legacy pen highlight (kept for backward compat)
   promptHighlights?: string[];  // legacy prompt highlight

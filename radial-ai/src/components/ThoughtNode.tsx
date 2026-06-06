@@ -6,8 +6,9 @@ import { computeNodeNumbers } from '../utils/nodeNumbers';
 
 function ThoughtNode({ id, data }: NodeProps) {
   const nodeData = data as ThoughtNodeData;
-  const { selectedNodeId, deleteNode, nodes } = useCanvasStore();
+  const { selectedNodeId, deleteNode, nodes, replayRevealed } = useCanvasStore();
   const isSelected = selectedNodeId === id;
+  const dimmed = Array.isArray(replayRevealed) && !replayRevealed.includes(id);
 
   const nodeNum = useMemo(() => {
     const map = computeNodeNumbers(nodes);
@@ -16,8 +17,10 @@ function ThoughtNode({ id, data }: NodeProps) {
 
   if (nodeData.type !== 'thoughtNode') return null;
 
+  const isBlank = !nodeData.prompt && !nodeData.response && !nodeData.isLoading;
+  const preview = nodeData.prompt || nodeData.response || '';
   const displayText = nodeData.title
-    ?? (nodeData.prompt.length > 55 ? nodeData.prompt.slice(0, 55) + '…' : nodeData.prompt);
+    ?? (preview.length > 55 ? preview.slice(0, 55) + '…' : preview);
 
   // Handles are invisible — FloatingEdge computes its own border-point endpoints
   const handleStyle = { opacity: 0, width: 8, height: 8 };
@@ -27,6 +30,8 @@ function ThoughtNode({ id, data }: NodeProps) {
       className="relative rounded-xl overflow-hidden transition-all select-none"
       style={{
         width: 220,
+        opacity: dimmed ? 0.12 : 1,
+        transition: 'opacity 0.45s ease, box-shadow 0.15s ease, border-color 0.15s ease',
         background: isSelected ? 'var(--bg-panel-header)' : 'var(--bg-base)',
         border: isSelected
           ? '1.5px solid #f472b6'
@@ -78,6 +83,10 @@ function ThoughtNode({ id, data }: NodeProps) {
             />
             <span className="text-xs text-pink-300">Thinking…</span>
           </div>
+        ) : isBlank ? (
+          <p className="text-xs italic leading-relaxed m-0" style={{ color: 'var(--text-placeholder)' }}>
+            空白節點 · 在下方輸入問題開始
+          </p>
         ) : (
           <p className="text-xs text-gray-600 leading-relaxed m-0">{displayText}</p>
         )}

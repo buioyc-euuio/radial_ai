@@ -338,6 +338,7 @@ export default function ReadingPanel() {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const promptRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const toolbarRef = useRef<HTMLDivElement>(null);
   const [newAnnId, setNewAnnId] = useState<string | null>(null);
   const promptHandleIndicatorRef = useRef<HTMLDivElement>(null);
   const savedRangeRef = useRef<Range | null>(null);
@@ -657,17 +658,44 @@ export default function ReadingPanel() {
     return () => document.removeEventListener('mouseup', onMouseUp);
   }, []);
 
-  // ── Dismiss toolbar on outside click ──────────────────────────────────────
+  // ── Dismiss toolbar on any click that isn't on the toolbar itself ─────────
+  // Clicking elsewhere (even inside the panel) collapses the selection, so the
+  // toolbar must go too. A fresh selection re-shows it on the following mouseup.
   useEffect(() => {
     const onMouseDown = (e: MouseEvent) => {
-      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
-        setToolbar(null);
-        savedRangeRef.current = null;
-      }
+      if (toolbarRef.current?.contains(e.target as Node)) return; // keep when using the toolbar
+      setToolbar(null);
+      savedRangeRef.current = null;
     };
     document.addEventListener('mousedown', onMouseDown);
     return () => document.removeEventListener('mousedown', onMouseDown);
   }, []);
+
+  // ── Keep the toolbar pinned to the selection while scrolling / resizing ───
+  const toolbarVisible = !!toolbar;
+  useEffect(() => {
+    if (!toolbarVisible) return;
+    const reposition = () => {
+      const range = savedRangeRef.current;
+      const panel = panelRef.current;
+      if (!range || !panel) return;
+      const rect = range.getBoundingClientRect();
+      if (rect.width === 0 && rect.height === 0) return; // selection gone
+      const panelRect = panel.getBoundingClientRect();
+      setToolbar(t => t ? {
+        ...t,
+        x: rect.left + rect.width / 2 - panelRect.left,
+        y: rect.top - panelRect.top,
+      } : t);
+    };
+    const sc = scrollContainerRef.current;
+    sc?.addEventListener('scroll', reposition, { passive: true });
+    window.addEventListener('resize', reposition);
+    return () => {
+      sc?.removeEventListener('scroll', reposition);
+      window.removeEventListener('resize', reposition);
+    };
+  }, [toolbarVisible]);
 
   // ── Keyboard shortcuts ────────────────────────────────────────────────────
   // Use e.code (physical key) instead of e.key so shortcuts work even when
@@ -722,6 +750,7 @@ export default function ReadingPanel() {
       {/* Floating toolbar */}
       {toolbar && (
         <div
+          ref={toolbarRef}
           className="absolute z-50 flex items-center gap-1 rounded-xl px-2 py-1.5 pointer-events-auto"
           onMouseDown={(e) => e.preventDefault()}
           style={{

@@ -8,10 +8,14 @@ import {
   type NodeTypes,
   type EdgeTypes,
   type Node,
+  type Edge,
+  type ReactFlowInstance,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
 import { useCanvasStore, getModelProvider } from './store/canvasStore';
+import { computeNodeNumbers } from './utils/nodeNumbers';
+import type { NodeData } from './store/types';
 import logo from './assets/logo-transparent.png';
 import ThoughtNode from './components/ThoughtNode';
 import AnnotationNode from './components/AnnotationNode';
@@ -138,7 +142,8 @@ function CanvasView() {
   const {
     closeProject,
     nodes, edges,
-    onNodesChange, onEdgesChange, onConnect,
+    onNodesChange, onEdgesChange, onConnect, onReconnect, addBlankNode,
+    setReplayRevealed, retitleAllNodes, replayRevealed,
     setSelectedNode, selectedNodeId,
     navigateBack, navigateForward,
     addFullNodeCapsule,
@@ -259,6 +264,56 @@ function CanvasView() {
 
   const handlePaneClick = useCallback(() => {}, []);
 
+  // Capture the ReactFlow instance so we can map screen → flow coordinates.
+  const rfInstanceRef = useRef<ReactFlowInstance<Node<NodeData>, Edge> | null>(null);
+
+  // Double-click empty canvas → drop a fresh blank node under the cursor.
+  const handlePaneDoubleClick = useCallback((e: React.MouseEvent) => {
+    const target = e.target as HTMLElement;
+    if (!target.classList.contains('react-flow__pane')) return; // ignore nodes/edges/controls
+    const inst = rfInstanceRef.current;
+    if (!inst) return;
+    const pos = inst.screenToFlowPosition({ x: e.clientX, y: e.clientY });
+    addBlankNode({ x: pos.x - 110, y: pos.y - 20 }); // center the 220px node on the cursor
+  }, [addBlankNode]);
+
+  // ── Birth-order replay: dim all, light up in node-number order, then restore ──
+  const replayTimerRef = useRef<number | null>(null);
+  const startReplay = useCallback(() => {
+    if (replayTimerRef.current !== null) return; // already playing
+    const all = useCanvasStore.getState().nodes;
+    const numbers = computeNodeNumbers(all);
+    const ordered = all
+      .filter(n => n.data.type === 'thoughtNode' && numbers.get(n.id))
+      .sort((a, b) => Number(numbers.get(a.id)) - Number(numbers.get(b.id)))
+      .map(n => n.id);
+    if (ordered.length === 0) return;
+    setReplayRevealed([]); // dim everything
+    let i = 0;
+    replayTimerRef.current = window.setInterval(() => {
+      i++;
+      setReplayRevealed(ordered.slice(0, i));
+      if (i >= ordered.length) {
+        window.clearInterval(replayTimerRef.current!);
+        replayTimerRef.current = null;
+        window.setTimeout(() => setReplayRevealed(null), 900); // back to normal
+      }
+    }, 450);
+  }, [setReplayRevealed]);
+
+  // Clean up the replay timer on unmount.
+  useEffect(() => () => {
+    if (replayTimerRef.current !== null) window.clearInterval(replayTimerRef.current);
+  }, []);
+
+  const [isRetitling, setIsRetitling] = useState(false);
+  const handleRetitleAll = useCallback(async () => {
+    if (isRetitling) return;
+    setIsRetitling(true);
+    try { await retitleAllNodes(); }
+    finally { setIsRetitling(false); }
+  }, [isRetitling, retitleAllNodes]);
+
   const modelShortName = model.includes('gemini')
     ? model.replace('gemini-', 'Gemini ').split('-').slice(0, 3).join(' ')
     : model.split('-').slice(0, 3).join(' ');
@@ -329,6 +384,22 @@ function CanvasView() {
               />
             )}
           </button>
+
+          {/* Birth-order replay animation */}
+          <button
+            onClick={startReplay}
+            disabled={replayRevealed !== null}
+            title="播放節點誕生動畫（依節點編號依序亮起）"
+            className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs transition-all"
+            style={{
+              background: 'var(--bg-subtle)',
+              border: '1px solid var(--border-base)',
+              color: replayRevealed !== null ? 'var(--text-faint)' : '#f472b6',
+            }}
+          >
+            <span>{replayRevealed !== null ? '◉' : '▶'}</span>
+            <span className="hidden sm:inline">{replayRevealed !== null ? '播放中…' : '誕生動畫'}</span>
+          </button>
         </div>
 
         {/* Right: hints + view toggles + theme + api key */}
@@ -346,6 +417,22 @@ function CanvasView() {
             <ViewBtn icon={<IconSplit />}      label="Split view"   active={viewMode === 'split'}  onClick={() => setViewMode('split')} />
             <ViewBtn icon={<IconPanelOnly />}  label="Panel only"  active={viewMode === 'panel'}  onClick={() => setViewMode('panel')} />
           </div>
+
+          {/* AI rename all node titles (free Gemini) */}
+          <button
+            onClick={handleRetitleAll}
+            disabled={isRetitling}
+            title="用免費 Gemini 重新命名所有節點標題"
+            className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs transition-all"
+            style={{
+              background: 'var(--bg-subtle)',
+              border: '1px solid var(--border-base)',
+              color: isRetitling ? 'var(--text-faint)' : '#a78bfa',
+            }}
+          >
+            <span>{isRetitling ? '⏳' : '✨'}</span>
+            <span className="hidden md:inline">{isRetitling ? '命名中…' : 'AI命名'}</span>
+          </button>
 
           {/* Theme toggle */}
           <button
@@ -398,11 +485,15 @@ function CanvasView() {
               onNodesChange={onNodesChange}
               onEdgesChange={onEdgesChange}
               onConnect={onConnect}
+              onReconnect={onReconnect}
+              onInit={(inst) => { rfInstanceRef.current = inst; }}
               nodeTypes={nodeTypes}
               edgeTypes={edgeTypes}
               onNodeClick={handleNodeClick}
               onPaneClick={handlePaneClick}
+              onDoubleClick={handlePaneDoubleClick}
               nodesDraggable={true}
+              zoomOnDoubleClick={false}
               multiSelectionKeyCode="Shift"
               fitView
               fitViewOptions={{ padding: 0.3 }}
