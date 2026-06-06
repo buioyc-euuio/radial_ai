@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { GoogleLogin, type CredentialResponse } from '@react-oauth/google';
 import { useCanvasStore } from '../store/canvasStore';
+import { parseCanvasImport } from '../utils/exportImport';
 import { useAuthStore, activateTrial, type GoogleUser, type TrialStatus } from '../store/authStore';
 import ApiKeyModal, { LOCKED_MODEL } from './ApiKeyModal';
 import UsageBar from './UsageBar';
@@ -200,7 +201,7 @@ function WhitelistDebugToggle() {
 }
 
 export default function HomePage() {
-  const { projects, createProject, openProject, deleteProject, renameProject, apiKey, geminiApiKey, model, setModel, theme, toggleTheme } = useCanvasStore();
+  const { projects, createProject, openProject, deleteProject, renameProject, importProject, apiKey, geminiApiKey, model, setModel, theme, toggleTheme } = useCanvasStore();
   const { user, login, logout, isWhitelisted, setWhitelisted, trial, setTrial, setDevMode,
     credential, trialPromptDismissed, setTrialPromptDismissed } = useAuthStore();
   const [showTrialOptIn, setShowTrialOptIn] = useState(false);
@@ -260,6 +261,22 @@ export default function HomePage() {
     const name = renameValue.trim();
     if (name) renameProject(id, name);
     setRenamingId(null);
+  };
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [importError, setImportError] = useState('');
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // let the same file be re-picked later
+    if (!file) return;
+    try {
+      const result = parseCanvasImport(await file.text());
+      if (!result.ok) { setImportError(result.error); return; }
+      setImportError('');
+      importProject(result.data); // creates the canvas and opens it
+    } catch {
+      setImportError('讀取檔案失敗');
+    }
   };
 
   const sorted = [...projects].sort((a, b) => b.updatedAt - a.updatedAt);
@@ -332,6 +349,23 @@ export default function HomePage() {
             )
           )}
 
+          {/* Import canvas */}
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            title="從 .radial.json 檔匯入畫布"
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all"
+            style={{ color: '#60a5fa', background: 'var(--bg-subtle)', border: '1px solid var(--border-base)' }}
+          >
+            <span>⤒</span><span className="hidden sm:inline">匯入</span>
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".json,application/json"
+            className="hidden"
+            onChange={handleImportFile}
+          />
+
           {/* Theme toggle */}
           <button
             onClick={toggleTheme}
@@ -382,6 +416,9 @@ export default function HomePage() {
             <p className="text-xs mt-1.5" style={{ color: '#92400e' }}>
               🎁 你正在免費試用開發者 API Key，還剩 <b>{trial?.daysLeft}</b> 天 — 無需自備金鑰即可使用。
             </p>
+          )}
+          {importError && (
+            <p className="text-xs mt-1.5" style={{ color: '#e11d48' }}>⚠ 匯入失敗：{importError}</p>
           )}
         </div>
 

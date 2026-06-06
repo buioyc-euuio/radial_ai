@@ -18,7 +18,10 @@ function ThoughtNode({ id, data }: NodeProps) {
   if (nodeData.type !== 'thoughtNode') return null;
 
   const isBlank = !nodeData.prompt && !nodeData.response && !nodeData.isLoading;
-  const preview = nodeData.prompt || nodeData.response || '';
+  // Manual ("貼上原文") nodes have prompt "無", so preview their response instead.
+  const preview = nodeData.manual
+    ? (nodeData.response || nodeData.prompt || '')
+    : (nodeData.prompt || nodeData.response || '');
   const displayText = nodeData.title
     ?? (preview.length > 55 ? preview.slice(0, 55) + '…' : preview);
 

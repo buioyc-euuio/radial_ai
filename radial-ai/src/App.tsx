@@ -15,6 +15,7 @@ import '@xyflow/react/dist/style.css';
 
 import { useCanvasStore, getModelProvider } from './store/canvasStore';
 import { computeNodeNumbers } from './utils/nodeNumbers';
+import { buildCanvasJSON, buildCanvasMarkdown, safeFileStem, downloadText } from './utils/exportImport';
 import type { NodeData } from './store/types';
 import logo from './assets/logo-transparent.png';
 import ThoughtNode from './components/ThoughtNode';
@@ -150,7 +151,10 @@ function CanvasView() {
     apiKey, geminiApiKey, model,
     theme, toggleTheme,
     systemPrompt, personaName,
+    projects, currentProjectId, renameProject,
   } = useCanvasStore();
+
+  const currentProject = projects.find(p => p.id === currentProjectId);
 
   // Mouse side-button navigation (X1 = back, X2 = forward)
   useEffect(() => {
@@ -203,6 +207,9 @@ function CanvasView() {
   const activeKeySet = activeProvider === 'google' ? !!geminiApiKey : !!apiKey;
   const [showApiModal, setShowApiModal] = useState(!apiKey && !geminiApiKey);
   const [showPersonaModal, setShowPersonaModal] = useState(false);
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState('');
+  const [showExportMenu, setShowExportMenu] = useState(false);
 
   const [viewMode, setViewMode] = useState<ViewMode>('split');
   const [splitPercent, setSplitPercent] = useState(40);
@@ -262,7 +269,9 @@ function CanvasView() {
     [setSelectedNode, addFullNodeCapsule]
   );
 
-  const handlePaneClick = useCallback(() => {}, []);
+  // Click empty canvas → deselect, returning to default-timeline mode for the
+  // next prompt (no reference → new node lands on the timeline).
+  const handlePaneClick = useCallback(() => { setSelectedNode(null); }, [setSelectedNode]);
 
   // Capture the ReactFlow instance so we can map screen → flow coordinates.
   const rfInstanceRef = useRef<ReactFlowInstance<Node<NodeData>, Edge> | null>(null);
@@ -314,6 +323,29 @@ function CanvasView() {
     finally { setIsRetitling(false); }
   }, [isRetitling, retitleAllNodes]);
 
+  // ── Editable canvas title ─────────────────────────────────────────────────
+  const commitTitle = useCallback(() => {
+    if (currentProjectId && titleDraft.trim()) renameProject(currentProjectId, titleDraft.trim());
+    setEditingTitle(false);
+  }, [currentProjectId, titleDraft, renameProject]);
+
+  // ── Export current canvas (JSON = lossless re-import, MD = for other LLMs) ──
+  const handleExport = useCallback((fmt: 'json' | 'md') => {
+    setShowExportMenu(false);
+    const state = useCanvasStore.getState();
+    const name = state.projects.find(p => p.id === state.currentProjectId)?.name ?? 'canvas';
+    const stem = safeFileStem(name);
+    if (fmt === 'json') {
+      const json = buildCanvasJSON(
+        { name, nodes: state.nodes, edges: state.edges, systemPrompt: state.systemPrompt, personaName: state.personaName },
+        Date.now(),
+      );
+      downloadText(`${stem}.radial.json`, json, 'application/json');
+    } else {
+      downloadText(`${stem}.md`, buildCanvasMarkdown(name, state.nodes), 'text/markdown');
+    }
+  }, []);
+
   const modelShortName = model.includes('gemini')
     ? model.replace('gemini-', 'Gemini ').split('-').slice(0, 3).join(' ')
     : model.split('-').slice(0, 3).join(' ');
@@ -356,6 +388,33 @@ function CanvasView() {
               Radial AI
             </span>
           </button>
+
+          {/* Editable canvas title */}
+          {currentProject && (editingTitle ? (
+            <input
+              value={titleDraft}
+              onChange={(e) => setTitleDraft(e.target.value)}
+              onBlur={commitTitle}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') commitTitle();
+                if (e.key === 'Escape') setEditingTitle(false);
+              }}
+              autoFocus
+              className="text-sm font-semibold rounded-lg px-2 py-1 outline-none max-w-[220px]"
+              style={{ background: 'var(--bg-subtle)', border: '1.5px solid var(--border-accent)', color: 'var(--text-body)' }}
+            />
+          ) : (
+            <button
+              onClick={() => { setTitleDraft(currentProject.name); setEditingTitle(true); }}
+              title="點擊編輯畫布標題"
+              className="text-sm font-semibold px-2 py-1 rounded-lg transition-colors truncate max-w-[220px]"
+              style={{ color: 'var(--text-body)' }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--bg-subtle)'; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+            >
+              {currentProject.name}
+            </button>
+          ))}
 
           {/* Persona trigger */}
           <button
@@ -416,6 +475,44 @@ function CanvasView() {
             <ViewBtn icon={<IconCanvasOnly />} label="Canvas only" active={viewMode === 'canvas'} onClick={() => setViewMode('canvas')} />
             <ViewBtn icon={<IconSplit />}      label="Split view"   active={viewMode === 'split'}  onClick={() => setViewMode('split')} />
             <ViewBtn icon={<IconPanelOnly />}  label="Panel only"  active={viewMode === 'panel'}  onClick={() => setViewMode('panel')} />
+          </div>
+
+          {/* Export current canvas */}
+          <div className="relative">
+            <button
+              onClick={() => setShowExportMenu(v => !v)}
+              title="匯出此畫布"
+              className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs transition-all"
+              style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border-base)', color: '#60a5fa' }}
+            >
+              <span>⤓</span><span className="hidden md:inline">匯出</span>
+            </button>
+            {showExportMenu && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowExportMenu(false)} />
+                <div
+                  className="absolute right-0 mt-1 z-50 rounded-xl overflow-hidden min-w-[190px]"
+                  style={{ background: 'var(--bg-overlay)', border: '1px solid var(--border-base)', boxShadow: '0 8px 32px var(--shadow-md)', backdropFilter: 'blur(8px)' }}
+                >
+                  <button
+                    onClick={() => handleExport('md')}
+                    className="w-full text-left px-3 py-2 text-xs transition-colors hover:bg-black/5"
+                    style={{ color: 'var(--text-body)' }}
+                  >
+                    📄 匯出 Markdown
+                    <div className="text-[10px]" style={{ color: 'var(--text-faint)' }}>給其他 LLM 閱讀</div>
+                  </button>
+                  <button
+                    onClick={() => handleExport('json')}
+                    className="w-full text-left px-3 py-2 text-xs transition-colors hover:bg-black/5"
+                    style={{ color: 'var(--text-body)', borderTop: '1px solid var(--border-base)' }}
+                  >
+                    🧩 匯出 JSON
+                    <div className="text-[10px]" style={{ color: 'var(--text-faint)' }}>可重新匯入 Radial AI（完整保留）</div>
+                  </button>
+                </div>
+              </>
+            )}
           </div>
 
           {/* AI rename all node titles (free Gemini) */}

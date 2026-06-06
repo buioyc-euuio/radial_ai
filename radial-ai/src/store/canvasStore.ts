@@ -269,23 +269,18 @@ const STARTER_SEED_VERSION = 1;
 // ── Main timeline helpers ──────────────────────────────────────────────────────
 
 // Returns the last node in the vertical main timeline chain.
+// Default-timeline nodes are NOT connected by edges, so the last one is found by
+// position: the lowest (max y) node sitting in the main-timeline column that has
+// no incoming edge (i.e. it isn't a branch child).
 function getMainTimelineLastNode(nodes: Node<NodeData>[], edges: Edge[]): Node<NodeData> | null {
-  const relevant = nodes.filter(n => n.data.type === 'thoughtNode' || n.data.type === 'placeholderNode');
-  if (relevant.length === 0) return null;
   const hasIncoming = new Set(edges.map(e => e.target));
-  const roots = relevant.filter(n => !hasIncoming.has(n.id));
-  if (roots.length === 0) return relevant.sort((a, b) => b.position.y - a.position.y)[0];
-  const root = roots.sort((a, b) => a.position.y - b.position.y)[0];
-  const mainEdges = edges.filter(e => e.sourceHandle === 'source-bottom' && e.targetHandle === 'target-top');
-  let current: Node<NodeData> = root;
-  while (true) {
-    const next = mainEdges.find(e => e.source === current.id);
-    if (!next) break;
-    const nextNode = relevant.find(n => n.id === next.target);
-    if (!nextNode) break;
-    current = nextNode;
-  }
-  return current;
+  const column = nodes.filter(n =>
+    (n.data.type === 'thoughtNode' || n.data.type === 'placeholderNode')
+    && Math.abs(n.position.x - MAIN_TIMELINE_X) < 40
+    && !hasIncoming.has(n.id)
+  );
+  if (column.length === 0) return null;
+  return column.sort((a, b) => b.position.y - a.position.y)[0];
 }
 
 // Pick edge handles based on relative position of source→target.
@@ -364,6 +359,7 @@ interface CanvasStore {
   closeProject: () => void;
   deleteProject: (id: string) => void;
   renameProject: (id: string, name: string) => void;
+  importProject: (data: { name: string; nodes: Node<NodeData>[]; edges: Edge[]; systemPrompt?: string; personaName?: string }) => void;
 
   // Settings
   setApiKey: (key: string) => void;
@@ -653,20 +649,14 @@ function buildParentLinkage(
       });
     }
   } else {
+    // Root on the main vertical timeline. Default-timeline nodes are stacked but
+    // intentionally NOT connected by an edge (so no ancestral line between them).
     const lastMainNode = getMainTimelineLastNode(nodes, edges);
     if (lastMainNode) {
       position = {
         x: lastMainNode.position.x,
         y: lastMainNode.position.y + NODE_HEIGHT_ESTIMATE + NODE_VERTICAL_GAP,
       };
-      parentEdges.push({
-        id: `e_${lastMainNode.id}_${newNodeId}`,
-        source: lastMainNode.id, target: newNodeId,
-        sourceHandle: 'source-bottom', targetHandle: 'target-top',
-        type: 'floatingEdge',
-        markerEnd: { type: 'arrowclosed' as const },
-        style: { stroke: '#f472b6' },
-      });
     }
   }
 
@@ -814,6 +804,30 @@ export const useCanvasStore = create<CanvasStore>()(
         projects: state.projects.map(p => p.id === id ? { ...p, name, updatedAt: Date.now() } : p),
       })),
 
+      // Create a new canvas from imported data and open it.
+      importProject: (data) => {
+        const id = uuidv4();
+        const now = Date.now();
+        _navReset();
+        const project: Project = {
+          id, name: data.name, createdAt: now, updatedAt: now,
+          nodes: data.nodes, edges: data.edges,
+          systemPrompt: data.systemPrompt, personaName: data.personaName,
+        };
+        const firstNode = data.nodes.find(n => n.data.type === 'thoughtNode') ?? null;
+        set((state) => ({
+          projects: [project, ...state.projects],
+          currentProjectId: id,
+          view: 'canvas',
+          nodes: data.nodes,
+          edges: data.edges,
+          contextCapsules: [],
+          selectedNodeId: firstNode?.id ?? null,
+          systemPrompt: data.systemPrompt ?? '',
+          personaName: data.personaName ?? '',
+        }));
+      },
+
       // ── Settings ────────────────────────────────────────────────────────
       setApiKey: (key) => set({ apiKey: key }),
       setGeminiApiKey: (key) => set({ geminiApiKey: key }),
@@ -886,53 +900,35 @@ export const useCanvasStore = create<CanvasStore>()(
         };
       }),
 
-      // Drop user-pasted text (e.g. another LLM's answer) straight into a node —
-      // no AI call. Fills the selected blank node in place, else creates a manual
-      // node wired to the current branch point. Title is generated afterwards.
+      // Drop user-pasted text (e.g. another LLM's answer) into a brand-new node —
+      // no AI call. The response holds the original text verbatim; the prompt is
+      // "無" (there was no question). Wired to the current branch point, then titled.
       commitOriginalText: (text) => {
         const trimmed = text.trim();
         if (!trimmed) return;
         const { nodes, edges, contextCapsules, selectedNodeId } = get();
-        const sel = selectedNodeId ? nodes.find(n => n.id === selectedNodeId) : undefined;
-        const selData = sel?.data.type === 'thoughtNode' ? (sel.data as ThoughtNodeData) : null;
-        const selIsBlank = !!selData && !selData.prompt && !selData.response;
-
-        let targetId: string;
-        if (sel && selIsBlank) {
-          targetId = sel.id;
-          set((state) => {
-            const newNodes = state.nodes.map(n =>
-              n.id === sel.id && n.data.type === 'thoughtNode'
-                ? { ...n, data: { ...n.data, response: trimmed, manual: true, isLoading: false } }
-                : n
-            );
-            return { nodes: newNodes, ...syncProject(state.projects, state.currentProjectId, newNodes, state.edges) };
-          });
-        } else {
-          const newNodeId = uuidv4();
-          const parentIds = resolveParentIds(nodes, contextCapsules, selectedNodeId);
-          const { position, parentEdges, ancestors } = buildParentLinkage(nodes, edges, parentIds, newNodeId);
-          targetId = newNodeId;
-          const newNode: Node<ThoughtNodeData> = {
-            id: newNodeId, type: 'thoughtNode', position,
-            data: {
-              type: 'thoughtNode', prompt: '', response: trimmed, manual: true,
-              isLoading: false, isCollapsed: false,
-              ancestorIds: ancestors.map(n => n.id),
-              references: contextCapsules.length > 0 ? [...contextCapsules] : undefined,
-            },
+        const newNodeId = uuidv4();
+        const parentIds = resolveParentIds(nodes, contextCapsules, selectedNodeId);
+        const { position, parentEdges, ancestors } = buildParentLinkage(nodes, edges, parentIds, newNodeId);
+        const newNode: Node<ThoughtNodeData> = {
+          id: newNodeId, type: 'thoughtNode', position,
+          data: {
+            type: 'thoughtNode', prompt: '無', response: trimmed, manual: true,
+            isLoading: false, isCollapsed: false,
+            ancestorIds: ancestors.map(n => n.id),
+            references: contextCapsules.length > 0 ? [...contextCapsules] : undefined,
+          },
+        };
+        set((state) => {
+          const newNodes = [...state.nodes.map(n => ({ ...n, selected: false })), newNode as Node<NodeData>];
+          const newEdges = parentEdges.length > 0 ? [...state.edges, ...parentEdges] : state.edges;
+          return {
+            nodes: newNodes, edges: newEdges,
+            contextCapsules: [], selectedNodeId: newNodeId,
+            ...syncProject(state.projects, state.currentProjectId, newNodes, newEdges),
           };
-          set((state) => {
-            const newNodes = [...state.nodes.map(n => ({ ...n, selected: false })), newNode as Node<NodeData>];
-            const newEdges = parentEdges.length > 0 ? [...state.edges, ...parentEdges] : state.edges;
-            return {
-              nodes: newNodes, edges: newEdges,
-              contextCapsules: [], selectedNodeId: newNodeId,
-              ...syncProject(state.projects, state.currentProjectId, newNodes, newEdges),
-            };
-          });
-        }
-        get().generateTitleForNode(targetId);
+        });
+        get().generateTitleForNode(newNodeId);
       },
 
       // Title a single node with a separate free-model call (best-effort).
