@@ -15,7 +15,7 @@ export default defineManifest({
     service_worker: 'src/background/background.ts',
     type: 'module',
   },
-  permissions: ['tabs', 'storage', 'activeTab'],
+  permissions: ['storage', 'activeTab'],
   host_permissions: [
     'https://gemini.google.com/*',
     'https://generativelanguage.googleapis.com/*',

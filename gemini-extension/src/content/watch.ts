@@ -1,10 +1,11 @@
 import { GEMINI } from './gemini-selectors'
 
-// Detect "user submitted a prompt" → notify PENDING immediately, then watch the
-// DOM until the streamed answer settles → notify READY with the new node id.
+// Detect "user submitted a prompt" → notify PENDING immediately, then poll the
+// NEW turn's answer text until it stops growing → notify READY. Polling the
+// answer text (not generic DOM mutations) is robust against Gemini's constant
+// background DOM activity, which made a mutation-idle heuristic never settle.
 
 type Notify = (type: 'PENDING' | 'READY', payload?: unknown) => void
-let submitting = false
 
 function snapshotIds(): Set<string> {
   return new Set(
@@ -13,31 +14,49 @@ function snapshotIds(): Set<string> {
 }
 
 export function initWatch(notify: Notify) {
+  let active = false
+
   const onSubmit = () => {
-    if (submitting) return
-    submitting = true
+    if (active) return
+    active = true
     const before = snapshotIds()
     notify('PENDING')
 
-    let idle: number | undefined
-    const finish = (id?: string) => {
-      if (!submitting) return
-      submitting = false
-      obs.disconnect()
-      clearTimeout(safety)
+    let last = ''
+    let stable = 0
+    let polls = 0
+    let timer = 0
+
+    const done = (id?: string) => {
+      if (!active) return
+      active = false
+      clearTimeout(timer)
       notify('READY', id ? { id } : undefined)
     }
-    const obs = new MutationObserver(() => {
-      // Settle when the DOM stops changing for ~1.8s and a new turn exists.
-      clearTimeout(idle)
-      idle = window.setTimeout(() => {
-        const fresh = Array.from(snapshotIds()).filter((id) => !before.has(id))
-        if (fresh.length) finish(fresh[fresh.length - 1])
-      }, 1800)
-    })
-    const target = document.querySelector(GEMINI.scrollContainer) ?? document.body
-    obs.observe(target, { childList: true, subtree: true })
-    const safety = window.setTimeout(() => finish(), 60000)
+
+    const tick = () => {
+      polls++
+      const fresh = Array.from(snapshotIds()).filter((id) => !before.has(id))
+      const newId = fresh[fresh.length - 1]
+      if (newId) {
+        const text =
+          document
+            .getElementById(newId)
+            ?.querySelector<HTMLElement>(GEMINI.modelMarkdown)
+            ?.innerText?.trim() ?? ''
+        if (text) {
+          if (text === last) stable++
+          else {
+            stable = 0
+            last = text
+          }
+          if (stable >= 3) return done(newId) // ~2.1s of unchanged answer text
+        }
+      }
+      if (polls > 80) return done(newId) // ~56s hard cap
+      timer = window.setTimeout(tick, 700)
+    }
+    timer = window.setTimeout(tick, 700)
   }
 
   document.addEventListener(

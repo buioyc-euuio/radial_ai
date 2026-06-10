@@ -14,6 +14,8 @@ interface DockState {
 
 const DEFAULT: DockState = { open: false, side: 'right', size: 440 }
 const MIN = 240
+// This extension's own origin (the iframe's origin), e.g. chrome-extension://<id>.
+const EXT_ORIGIN = chrome.runtime.getURL('').replace(/\/$/, '')
 let state: DockState = { ...DEFAULT }
 let root: HTMLDivElement | null = null
 let iframe: HTMLIFrameElement | null = null
@@ -53,9 +55,10 @@ function sizeEl(el: HTMLElement) {
   }
 }
 function applyPush() {
-  document.documentElement.style.setProperty('overflow', 'hidden', 'important')
   const root = geminiRoot()
-  sizeEl(root ?? document.body)
+  if (!root) return // shell not found → overlay instead of mutating <body> (which breaks Gemini)
+  document.documentElement.style.setProperty('overflow', 'hidden', 'important')
+  sizeEl(root)
 }
 function clearPush() {
   const root = geminiRoot()
@@ -217,26 +220,44 @@ function initRpc() {
       payload?: { id?: string; markId?: string }
     }
     if (!d || d.__radial !== 'req') return
-    if (iframe && e.source !== iframe.contentWindow) return
+    // Only accept requests from our own iframe — reject the page / other frames.
+    if (!iframe || e.source !== iframe.contentWindow || e.origin !== EXT_ORIGIN) return
     let payload: unknown
     if (d.type === 'IMPORT') payload = doImport()
     else if (d.type === 'JUMP') payload = { ok: scrollToNode(d.payload?.id ?? '') }
     else if (d.type === 'JUMP_MARK') payload = { ok: scrollToMark(d.payload?.markId ?? '') }
     else if (d.type === 'CONV_ID') payload = { conversationId: getConversationId() }
     else return
-    ;(e.source as Window | null)?.postMessage({ __radial: 'res', id: d.id, payload }, '*')
+    ;(e.source as Window).postMessage({ __radial: 'res', id: d.id, payload }, EXT_ORIGIN)
   })
 }
 
 /** Push an event from the content script down to the panel iframe. */
 export function notifyPanel(type: string, payload?: unknown) {
-  iframe?.contentWindow?.postMessage({ __radial: 'evt', type, payload }, '*')
+  iframe?.contentWindow?.postMessage({ __radial: 'evt', type, payload }, EXT_ORIGIN)
+}
+
+// Detect SPA navigation between chats (URL is the only reliable cross-context
+// signal — patching history from the isolated world wouldn't catch the page's
+// own router calls) and tell the panel to re-import the new conversation.
+let lastCid = getConversationId()
+function watchConversation() {
+  window.setInterval(() => {
+    const cid = getConversationId()
+    if (cid !== lastCid) {
+      lastCid = cid
+      notifyPanel('CONV_CHANGED', { conversationId: cid })
+    }
+  }, 500)
 }
 
 export async function initDock() {
   const r = await chrome.storage.local.get('dock')
   if (r.dock) state = { ...DEFAULT, ...(r.dock as DockState) }
   initRpc()
+  watchConversation()
+  // Make sure Gemini's layout is restored if the page unloads while docked.
+  window.addEventListener('pagehide', () => clearPush())
   if (state.open) build()
   window.addEventListener('resize', () => {
     if (!state.open) return

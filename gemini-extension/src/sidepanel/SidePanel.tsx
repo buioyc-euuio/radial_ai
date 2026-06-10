@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useStore } from './store'
 import { requestImport, getConvId, onContentEvent } from './gemini-bridge'
 import { Canvas } from './Canvas'
@@ -6,8 +6,13 @@ import { Inspector } from './Inspector'
 import { Settings } from './Settings'
 import { Notes } from './Notes'
 
+// Bumped on every conversation switch so a slow in-flight import can't apply its
+// (now stale) result over the newly-loaded chat.
+let importGen = 0
+
 // Import the current conversation, preserving user meta + applying a pending branch.
 async function runImport(): Promise<boolean> {
+  const gen = importGen
   const res = await requestImport()
   if (!res.ok) return false
   let branchParent: string | null | undefined
@@ -17,6 +22,7 @@ async function runImport(): Promise<boolean> {
     branchParent = r[k] as string | undefined
     if (branchParent) void chrome.storage.local.remove(k)
   }
+  if (gen !== importGen) return false // superseded by a conversation switch
   useStore.getState().importNodes(res.conversationId, res.nodes, branchParent)
   return true
 }
@@ -25,7 +31,7 @@ async function runImport(): Promise<boolean> {
 async function autoImportAndSummarize() {
   if (!(await runImport())) return
   const st = useStore.getState()
-  if (st.apiKey) {
+  if (st.apiKey && st.autoSummary) {
     const newest = [...st.nodes].sort((a, b) => b.domOrder - a.domOrder)[0]
     if (newest && !st.meta[newest.id]?.summary) {
       try {
@@ -56,17 +62,35 @@ export function SidePanel() {
   }, [hydrate])
 
   // Auto-add a loading node on submit; finalize + summarize when the answer lands.
+  const loadingTimer = useRef<number | undefined>(undefined)
   useEffect(() => {
     return onContentEvent(async (type) => {
       if (type === 'PENDING') {
         setLoading(true)
         setTab('canvas')
+        clearTimeout(loadingTimer.current)
+        loadingTimer.current = window.setTimeout(() => setLoading(false), 75000) // safety
       } else if (type === 'READY') {
-        await autoImportAndSummarize()
+        clearTimeout(loadingTimer.current)
+        try {
+          await autoImportAndSummarize()
+        } finally {
+          setLoading(false)
+        }
+      } else if (type === 'CONV_CHANGED') {
+        // Switched chats: invalidate in-flight imports, show the new conversation's
+        // cached tree at once, then re-import (Gemini renders the new chat async).
+        importGen++
+        clearTimeout(loadingTimer.current)
         setLoading(false)
+        await hydrate(await getConvId())
+        for (let i = 0; i < 5; i++) {
+          if (await runImport()) break
+          await new Promise((r) => setTimeout(r, 500))
+        }
       }
     })
-  }, [setLoading])
+  }, [setLoading, hydrate])
 
   async function refresh() {
     setImporting(true)

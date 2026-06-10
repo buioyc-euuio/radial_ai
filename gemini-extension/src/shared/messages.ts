@@ -1,28 +1,17 @@
-// Message protocol between the side panel and the Gemini content script.
-// All payloads are plain JSON (no live DOM nodes cross the boundary).
-
 export interface QAPair {
-  /** Stable id from Gemini's <div class="conversation-container" id="..."> */
   id: string
   question: string
   answerText: string
-  answerHtml: string
-  /** Order in the conversation as read from the DOM. */
   domOrder: number
   conversationId: string | null
 }
-
-export type Request =
-  | { type: 'PING' }
-  | { type: 'IMPORT_CONVERSATION' }
-  | { type: 'JUMP_TO'; id: string }
-  | { type: 'TOGGLE_DOCK' }
 
 export type ImportResult =
   | { ok: true; conversationId: string | null; nodes: QAPair[] }
   | { ok: false; error: string }
 
-export type JumpResult = { ok: boolean; error?: string }
+/** Background → content-script message (toolbar icon toggles the dock). */
+export type Request = { type: 'TOGGLE_DOCK' }
 
 /** A highlight/note mark on the Gemini page, persisted under `marks:<cid>`. */
 export interface SavedMark {
@@ -35,4 +24,5 @@ export interface SavedMark {
   note?: string
 }
 
-export const GEMINI_URL_MATCH = /^https:\/\/gemini\.google\.com\//
+/** Origin of the host page the content script runs on. */
+export const GEMINI_ORIGIN = 'https://gemini.google.com'

@@ -29,6 +29,7 @@ interface StoreState extends PersistShape {
   loading: boolean
   apiKey: string
   model: string
+  autoSummary: boolean
   hydrate: (conversationId: string | null) => Promise<void>
   importNodes: (
     conversationId: string | null,
@@ -44,7 +45,7 @@ interface StoreState extends PersistShape {
   setLoading: (v: boolean) => void
   pushHistory: () => void
   undo: () => void
-  setSettings: (apiKey: string, model: string) => void
+  setSettings: (apiKey: string, model: string, autoSummary: boolean) => void
   setSummary: (id: string, summary: string) => void
   summarizeNode: (id: string) => Promise<void>
 }
@@ -77,12 +78,21 @@ export const useStore = create<StoreState>((set, get) => ({
   loading: false,
   apiKey: '',
   model: DEFAULT_MODEL,
+  autoSummary: true,
 
   hydrate: async (conversationId) => {
+    history.length = 0 // undo is per-conversation; don't carry snapshots across chats
     const keys = ['settings', keyFor(conversationId)]
     const res = await chrome.storage.local.get(keys)
-    const settings = res['settings'] as { apiKey?: string; model?: string } | undefined
-    if (settings) set({ apiKey: settings.apiKey ?? '', model: settings.model || DEFAULT_MODEL })
+    const settings = res['settings'] as
+      | { apiKey?: string; model?: string; autoSummary?: boolean }
+      | undefined
+    if (settings)
+      set({
+        apiKey: settings.apiKey ?? '',
+        model: settings.model || DEFAULT_MODEL,
+        autoSummary: settings.autoSummary ?? true,
+      })
 
     const saved = conversationId
       ? (res[keyFor(conversationId)] as PersistShape | undefined)
@@ -166,9 +176,10 @@ export const useStore = create<StoreState>((set, get) => ({
     persist({ conversationId: get().conversationId, nodes: get().nodes, meta: prev })
   },
 
-  setSettings: (apiKey, model) => {
-    set({ apiKey, model: model || DEFAULT_MODEL })
-    void chrome.storage.local.set({ settings: { apiKey, model: model || DEFAULT_MODEL } })
+  setSettings: (apiKey, model, autoSummary) => {
+    const m = model || DEFAULT_MODEL
+    set({ apiKey, model: m, autoSummary })
+    void chrome.storage.local.set({ settings: { apiKey, model: m, autoSummary } })
   },
 
   setSummary: (id, summary) => {

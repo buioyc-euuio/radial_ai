@@ -70,6 +70,10 @@ function applyMark(m: SavedMark): void {
   if (el.querySelector(`mark[data-mark-id="${m.id}"]`)) return // already applied
   const range = rangeFromOffsets(el, m.start, m.end)
   if (!range) return
+  // Guard against Gemini regenerating the answer: if the text at this offset no
+  // longer matches what was highlighted, skip rather than mis-anchor onto it.
+  const norm = (s: string) => s.replace(/\s+/g, '').slice(0, 24)
+  if (m.text && norm(range.toString()) !== norm(m.text)) return
   applyMarkToRange(range, CLASS[m.type], el, (mk) => {
     mk.dataset.markId = m.id
     mk.dataset.markType = m.type

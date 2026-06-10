@@ -29,7 +29,6 @@ export function parseConversation(): { conversationId: string | null; nodes: QAP
 
     const question = readUserText(userEl)
     const answerText = (modelEl?.innerText ?? '').trim()
-    const answerHtml = modelEl?.innerHTML ?? ''
 
     // Skip empty/streaming-only shells (both sides blank).
     if (!question && !answerText) return
@@ -38,7 +37,6 @@ export function parseConversation(): { conversationId: string | null; nodes: QAP
       id: container.id,
       question,
       answerText,
-      answerHtml,
       domOrder: i,
       conversationId,
     })
