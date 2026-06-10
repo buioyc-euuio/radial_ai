@@ -18,8 +18,12 @@ export const GEMINI = {
   scrollContainer: 'infinite-scroller[data-test-id="chat-history-container"]',
   /** The prompt input (Quill contenteditable). */
   inputEditor: 'rich-textarea .ql-editor',
+  /** The visible rounded composer box (used to align the selection toolbar). */
+  inputBox: 'input-area-v2, .input-area, .text-input-field',
   /** The send button. */
   sendButton: 'button.send-button',
+  /** Gemini's top-level app shell — resized to make room for the dock. */
+  appRoot: 'chat-app, #app-root',
 } as const
 
 /** Conversation id from the URL, e.g. /app/<id>. */

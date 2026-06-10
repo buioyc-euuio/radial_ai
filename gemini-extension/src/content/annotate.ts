@@ -4,17 +4,9 @@
 
 import { GEMINI, getConversationId } from './gemini-selectors'
 import { applyMarkToRange, offsetOf, rangeFromOffsets } from './domMark'
+import type { SavedMark } from '../shared/messages'
 
 type MarkType = 'pen' | 'note'
-interface SavedMark {
-  id: string
-  nodeId: string // conversation-container id
-  type: MarkType
-  start: number
-  end: number
-  text: string
-  note?: string
-}
 
 const CLASS: Record<MarkType, string> = { pen: 'radial-pen', note: 'radial-note' }
 
@@ -24,6 +16,19 @@ let pending: { nodeId: string; el: HTMLElement; range: Range; text: string } | n
 let toolbarEl: HTMLDivElement | null = null
 let popoverEl: HTMLDivElement | null = null
 let toolbarVisible = false
+
+// Cached dock geometry, so the bottom bar can center within the Gemini area.
+let dockState: { open: boolean; side: string; size: number } = {
+  open: false,
+  side: 'right',
+  size: 440,
+}
+void chrome.storage.local.get('dock').then((r) => {
+  if (r.dock) dockState = r.dock as typeof dockState
+})
+chrome.storage.onChanged.addListener((c, area) => {
+  if (area === 'local' && c.dock?.newValue) dockState = c.dock.newValue as typeof dockState
+})
 
 // ── persistence ─────────────────────────────────────────────────────────────
 const keyFor = (cid: string) => `marks:${cid}`
@@ -134,6 +139,9 @@ function actNote() {
 function actQuote() {
   if (!pending) return
   const text = pending.text
+  // Record a pending branch: the next imported reply should hang off this node.
+  const cid = getConversationId()
+  if (cid) void chrome.storage.local.set({ [`pendingBranch:${cid}`]: pending.nodeId })
   const editor = document.querySelector<HTMLElement>(GEMINI.inputEditor)
   clearSelection()
   if (!editor) return
@@ -152,7 +160,7 @@ function buildToolbar() {
   toolbarEl.innerHTML = `
     <button data-act="quote">❝ 引用回覆 <kbd>⌘K</kbd></button>
     <button data-act="pen">✎ 螢光筆 <kbd>H</kbd></button>
-    <button data-act="note">＋ 筆記 <kbd>N</kbd></button>`
+    <button data-act="note">＋ 筆記 <kbd>D</kbd></button>`
   toolbarEl.addEventListener('mousedown', (e) => e.preventDefault())
   toolbarEl.addEventListener('click', (e) => {
     const act = (e.target as HTMLElement).closest('button')?.dataset.act
@@ -162,17 +170,56 @@ function buildToolbar() {
   })
   document.body.appendChild(toolbarEl)
 }
-function showToolbar(rect: DOMRect) {
+// Anchor the toolbar to Gemini's input box: same width & x as the composer, with
+// its bottom edge sitting just above the composer's top. Never covers the text.
+function reposition() {
+  if (!toolbarEl || !pending) return
+  const sel = pending.range.getBoundingClientRect()
+  if (sel.width === 0 && sel.height === 0) {
+    hideToolbar()
+    return
+  }
+  const th = toolbarEl.offsetHeight || 36
+  const box =
+    document.querySelector<HTMLElement>(GEMINI.inputBox) ??
+    document.querySelector<HTMLElement>(GEMINI.inputEditor)
+  const rect = box?.getBoundingClientRect()
+
+  if (rect && rect.width > 0) {
+    toolbarEl.style.left = `${rect.left}px`
+    toolbarEl.style.width = `${rect.width}px`
+    toolbarEl.style.top = `${rect.top - th - 6}px`
+    return
+  }
+
+  // Fallback: centered bottom of the non-dock area.
+  let availLeft = 8
+  let availRight = window.innerWidth - 8
+  let bottomGap = 96
+  if (dockState.open) {
+    if (dockState.side === 'right') availRight = window.innerWidth - dockState.size - 8
+    else if (dockState.side === 'left') availLeft = dockState.size + 8
+    else if (dockState.side === 'bottom') bottomGap = dockState.size + 20
+  }
+  const tw = toolbarEl.offsetWidth || 280
+  toolbarEl.style.width = ''
+  toolbarEl.style.left = `${Math.max(availLeft, (availLeft + availRight) / 2 - tw / 2)}px`
+  toolbarEl.style.top = `${window.innerHeight - th - bottomGap}px`
+}
+function showToolbar() {
   if (!toolbarEl) buildToolbar()
   if (!toolbarEl) return
-  toolbarEl.style.left = `${rect.left + rect.width / 2}px`
-  toolbarEl.style.top = `${rect.top}px`
   toolbarEl.style.display = 'flex'
   toolbarVisible = true
+  reposition()
+  document.addEventListener('scroll', reposition, true)
+  window.addEventListener('resize', reposition)
 }
 function hideToolbar() {
   if (toolbarEl) toolbarEl.style.display = 'none'
   toolbarVisible = false
+  document.removeEventListener('scroll', reposition, true)
+  window.removeEventListener('resize', reposition)
 }
 
 // ── popover (note editor / remove) ───────────────────────────────────────────
@@ -205,7 +252,18 @@ function openPopover(id: string, type: MarkType, rect: DOMRect, note: string) {
     }
   })
   document.body.appendChild(popoverEl)
-  popoverEl.querySelector<HTMLTextAreaElement>('.radial-note-input')?.focus()
+  const ta = popoverEl.querySelector<HTMLTextAreaElement>('.radial-note-input')
+  if (ta) {
+    ta.focus()
+    // Enter saves; Shift+Enter inserts a newline.
+    ta.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+        e.preventDefault()
+        updateNote(id, ta.value.trim())
+        closePopover()
+      }
+    })
+  }
 }
 
 // ── note hover tooltip ───────────────────────────────────────────────────────
@@ -231,11 +289,11 @@ function injectStyles() {
   const style = document.createElement('style')
   style.id = 'radial-annotate-style'
   style.textContent = `
-    mark.radial-pen { background: #bfdbfe !important; color: inherit !important; border-radius: 2px; }
-    mark.radial-note { background: #fef08a !important; color: inherit !important; border-radius: 2px; cursor: pointer; }
+    mark.radial-pen { background: #fff04d !important; color: inherit !important; border-radius: 2px; }
+    mark.radial-note { background: #fbcfe8 !important; color: inherit !important; border-radius: 2px; cursor: pointer; }
     .radial-toolbar {
-      position: fixed; z-index: 2147483600; transform: translate(-50%, calc(-100% - 8px));
-      display: flex; gap: 2px; padding: 4px; border-radius: 12px;
+      position: fixed; z-index: 2147483600; box-sizing: border-box;
+      display: flex; justify-content: center; gap: 8px; padding: 4px; border-radius: 12px;
       background: #fff; border: 1px solid #e2e8f0; box-shadow: 0 6px 24px rgba(15,23,42,.18);
       font-family: 'Google Sans', Roboto, system-ui, sans-serif;
     }
@@ -278,7 +336,7 @@ function onMouseUp() {
     const info = currentSelection()
     if (!info) return
     pending = { nodeId: info.nodeId, el: info.el, range: info.range.cloneRange(), text: info.text }
-    showToolbar(info.range.getBoundingClientRect())
+    showToolbar()
   }, 0)
 }
 function onMouseDown(e: MouseEvent) {
@@ -311,14 +369,17 @@ function onKeyDown(e: KeyboardEvent) {
   }
   if (!toolbarVisible) return
   const t = e.target as HTMLElement
+  // Only skip when typing in a field. We match on e.code (physical key), which is
+  // independent of the active IME / keyboard layout — so E works in 中文 or English.
   if (
     t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable ||
-    e.isComposing || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey
+    e.metaKey || e.ctrlKey || e.altKey || e.shiftKey
   )
     return
   switch (e.code) {
     case 'KeyL':
     case 'KeyC':
+    case 'KeyE':
       e.preventDefault()
       actQuote()
       break
@@ -327,9 +388,7 @@ function onKeyDown(e: KeyboardEvent) {
       e.preventDefault()
       actHighlight()
       break
-    case 'KeyN':
-    case 'KeyA':
-    case 'KeyE':
+    case 'KeyD':
       e.preventDefault()
       actNote()
       break

@@ -16,11 +16,23 @@ export type Request =
   | { type: 'PING' }
   | { type: 'IMPORT_CONVERSATION' }
   | { type: 'JUMP_TO'; id: string }
+  | { type: 'TOGGLE_DOCK' }
 
 export type ImportResult =
   | { ok: true; conversationId: string | null; nodes: QAPair[] }
   | { ok: false; error: string }
 
 export type JumpResult = { ok: boolean; error?: string }
+
+/** A highlight/note mark on the Gemini page, persisted under `marks:<cid>`. */
+export interface SavedMark {
+  id: string
+  nodeId: string
+  type: 'pen' | 'note'
+  start: number
+  end: number
+  text: string
+  note?: string
+}
 
 export const GEMINI_URL_MATCH = /^https:\/\/gemini\.google\.com\//

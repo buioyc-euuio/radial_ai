@@ -1,32 +1,94 @@
 import { useEffect, useState } from 'react'
 import { useStore } from './store'
-import { requestImport, activeGeminiTab, convIdFromUrl } from './gemini-bridge'
-import { GitTree } from './GitTree'
+import { requestImport, getConvId, onContentEvent } from './gemini-bridge'
+import { Canvas } from './Canvas'
 import { Inspector } from './Inspector'
+import { Settings } from './Settings'
+import { Notes } from './Notes'
+
+// Import the current conversation, preserving user meta + applying a pending branch.
+async function runImport(): Promise<boolean> {
+  const res = await requestImport()
+  if (!res.ok) return false
+  let branchParent: string | null | undefined
+  if (res.conversationId) {
+    const k = `pendingBranch:${res.conversationId}`
+    const r = await chrome.storage.local.get(k)
+    branchParent = r[k] as string | undefined
+    if (branchParent) void chrome.storage.local.remove(k)
+  }
+  useStore.getState().importNodes(res.conversationId, res.nodes, branchParent)
+  return true
+}
+
+// After a new answer lands: re-import and summarize just the newest node.
+async function autoImportAndSummarize() {
+  if (!(await runImport())) return
+  const st = useStore.getState()
+  if (st.apiKey) {
+    const newest = [...st.nodes].sort((a, b) => b.domOrder - a.domOrder)[0]
+    if (newest && !st.meta[newest.id]?.summary) {
+      try {
+        await st.summarizeNode(newest.id)
+      } catch {
+        // Summarizer unavailable → node falls back to showing the QA text.
+      }
+    }
+  }
+}
 
 export function SidePanel() {
-  const { nodes, conversationId, hydrate, importNodes } = useStore()
+  const { nodes, apiKey, hydrate, setLoading } = useStore()
   const [error, setError] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [sumProgress, setSumProgress] = useState<string | null>(null)
+  const [tab, setTab] = useState<'canvas' | 'notes'>('canvas')
 
-  // On open: load any saved tree for the conversation in the active Gemini tab.
+  // On open: load saved tree, then auto-import the live conversation.
   useEffect(() => {
     void (async () => {
-      const tab = await activeGeminiTab()
-      await hydrate(convIdFromUrl(tab?.url))
+      await hydrate(await getConvId())
+      setImporting(true)
+      await runImport()
+      setImporting(false)
     })()
   }, [hydrate])
 
-  async function onImport() {
+  // Auto-add a loading node on submit; finalize + summarize when the answer lands.
+  useEffect(() => {
+    return onContentEvent(async (type) => {
+      if (type === 'PENDING') {
+        setLoading(true)
+        setTab('canvas')
+      } else if (type === 'READY') {
+        await autoImportAndSummarize()
+        setLoading(false)
+      }
+    })
+  }, [setLoading])
+
+  async function refresh() {
+    setImporting(true)
+    await runImport()
+    setImporting(false)
+  }
+
+  async function summarizeAll() {
+    const st = useStore.getState()
+    const targets = st.nodes.filter((n) => !st.meta[n.id]?.summary)
     setError(null)
-    setBusy(true)
-    const res = await requestImport()
-    setBusy(false)
-    if (!res.ok) {
-      setError(res.error)
-      return
+    for (let i = 0; i < targets.length; i++) {
+      setSumProgress(`${i + 1}/${targets.length}`)
+      try {
+        await useStore.getState().summarizeNode(targets[i].id)
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e))
+        break
+      }
+      await new Promise((r) => setTimeout(r, 400))
     }
-    importNodes(res.conversationId, res.nodes)
+    setSumProgress(null)
   }
 
   return (
@@ -35,28 +97,61 @@ export function SidePanel() {
         <h1>
           Radial AI <span className="for">for Gemini</span>
         </h1>
-        <span className="phase">Phase 1</span>
+        <div className="head-actions">
+          <button className="gear" onClick={refresh} title="重新整理" disabled={importing}>
+            ↻
+          </button>
+          <button className="gear" onClick={() => setSettingsOpen((v) => !v)} title="設定">
+            ⚙
+          </button>
+        </div>
       </header>
 
-      <button className="primary" onClick={onImport} disabled={busy}>
-        {busy ? '匯入中…' : nodes.length ? '重新匯入目前對話' : '匯入目前對話'}
-      </button>
+      {settingsOpen && <Settings onClose={() => setSettingsOpen(false)} />}
 
-      {conversationId && nodes.length > 0 && (
-        <p className="meta">
-          {nodes.length} 個節點 · <code>{conversationId.slice(0, 12)}</code>
-        </p>
+      {nodes.length > 0 && (
+        <div className="actions">
+          <button
+            className="secondary"
+            onClick={summarizeAll}
+            disabled={!apiKey || sumProgress !== null}
+            title={apiKey ? '為所有未摘要的節點產生主題標題' : '請先在 ⚙ 設定 API 金鑰'}
+          >
+            {sumProgress ? `摘要中 ${sumProgress}` : '✨ 全部摘要'}
+          </button>
+        </div>
       )}
+
       {error && <p className="error">{error}</p>}
 
-      {nodes.length === 0 && !error && (
+      {nodes.length === 0 && (
         <p className="hint">
-          在 Gemini 對話頁按「匯入」，把問答抓成一棵由上到下的樹。滑到節點看內容，點一下跳回原訊息。
+          {importing
+            ? '匯入中…'
+            : '在 Gemini 開啟一個對話，節點會自動匯入；送出新問題也會自動長出節點。'}
         </p>
       )}
 
-      {nodes.length > 0 && <Inspector />}
-      {nodes.length > 0 && <GitTree />}
+      {nodes.length > 0 && (
+        <>
+          <div className="tabs">
+            <button className={tab === 'canvas' ? 'on' : ''} onClick={() => setTab('canvas')}>
+              畫布
+            </button>
+            <button className={tab === 'notes' ? 'on' : ''} onClick={() => setTab('notes')}>
+              筆記
+            </button>
+          </div>
+          {tab === 'canvas' ? (
+            <>
+              <Inspector />
+              <Canvas />
+            </>
+          ) : (
+            <Notes />
+          )}
+        </>
+      )}
     </div>
   )
 }

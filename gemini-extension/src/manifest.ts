@@ -15,16 +15,22 @@ export default defineManifest({
     service_worker: 'src/background/background.ts',
     type: 'module',
   },
-  permissions: ['sidePanel', 'tabs', 'storage', 'activeTab'],
-  host_permissions: ['https://gemini.google.com/*'],
-  side_panel: {
-    default_path: 'sidepanel.html',
-  },
+  permissions: ['tabs', 'storage', 'activeTab'],
+  host_permissions: [
+    'https://gemini.google.com/*',
+    'https://generativelanguage.googleapis.com/*',
+  ],
   content_scripts: [
     {
       matches: ['https://gemini.google.com/*'],
       js: ['src/content/content.ts'],
       run_at: 'document_idle',
+    },
+  ],
+  web_accessible_resources: [
+    {
+      resources: ['sidepanel.html', 'assets/*'],
+      matches: ['https://gemini.google.com/*'],
     },
   ],
 })
