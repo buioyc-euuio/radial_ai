@@ -7,16 +7,20 @@ export function doImport(): ImportResult {
   try {
     const { conversationId, nodes } = parseConversation()
     if (nodes.length === 0) {
-      return {
-        ok: false,
-        error: '在目前頁面找不到任何對話。請確認你在 gemini.google.com 的某個對話內。',
-      }
+      // On a real conversation URL but found no message nodes → likely still
+      // loading, or Gemini changed its layout. Otherwise: just not in a chat yet.
+      return conversationId
+        ? {
+            ok: false,
+            error: '在這個對話抓不到訊息 — Gemini 可能仍在載入,或版面已更新。請稍候/重整;若持續發生請回報。',
+          }
+        : { ok: false, error: '在 Gemini 開啟一個對話,就會自動匯入。' }
     }
     return { ok: true, conversationId, nodes }
   } catch (e) {
     return {
       ok: false,
-      error: `解析失敗：${String(e)}。Gemini 版面可能已更新，請回報以便修正 selector。`,
+      error: `解析失敗:${String(e)}。Gemini 版面可能已更新,請回報以便修正。`,
     }
   }
 }

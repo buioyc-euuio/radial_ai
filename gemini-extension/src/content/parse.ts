@@ -1,18 +1,23 @@
 import { GEMINI, getConversationId } from './gemini-selectors'
 import type { QAPair } from '../shared/messages'
 
+/** Drop Gemini's "你說了" / "You said" screen-reader label if it leads the text. */
+function stripLabel(t: string): string {
+  return t.replace(/^(你說了|You said)\s*[:：]?\s*/, '').trim()
+}
+
 /** Read the user's prompt text, stripping Gemini's hidden screen-reader label. */
 function readUserText(userEl: HTMLElement | null): string {
   if (!userEl) return ''
-  // Preferred: the dedicated query-text element (no "你說了" / "You said" label).
+  // Preferred: the dedicated query-text element.
   const q = userEl.querySelector<HTMLElement>(GEMINI.userText)
-  if (q) return (q.innerText ?? '').trim()
+  if (q) return stripLabel((q.innerText ?? '').trim())
   // Fallback: whole user-query innerText minus the leading .cdk-visually-hidden label.
   const hidden = userEl.querySelector<HTMLElement>('.cdk-visually-hidden')
   let t = (userEl.innerText ?? '').trim()
   const h = (hidden?.innerText ?? '').trim()
   if (h && t.startsWith(h)) t = t.slice(h.length).trim()
-  return t
+  return stripLabel(t)
 }
 
 /** Read the current Gemini conversation DOM into a flat list of QA nodes. */

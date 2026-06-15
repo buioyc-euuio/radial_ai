@@ -44,8 +44,10 @@ export async function jumpTo(id: string): Promise<void> {
   await rpc('JUMP', { id })
 }
 
-export function jumpMark(markId: string): void {
-  void rpc('JUMP_MARK', { markId })
+/** Jump to a mark; resolves false if it can't be found on the page anymore. */
+export async function jumpMark(markId: string): Promise<boolean> {
+  const r = await rpc<{ ok: boolean }>('JUMP_MARK', { markId })
+  return !!r?.ok
 }
 
 export async function getConvId(): Promise<string | null> {

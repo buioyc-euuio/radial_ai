@@ -12,9 +12,11 @@ import {
 import '@xyflow/react/dist/style.css'
 import { useStore, type NodeMeta } from './store'
 import { QANode } from './QANode'
+import { QAEdge } from './QAEdge'
 import { jumpTo } from './gemini-bridge'
 
 const nodeTypes = { qa: QANode }
+const edgeTypes = { qaEdge: QAEdge }
 
 /** All descendants of rootId (inclusive) following the parent links. */
 function subtreeOf(rootId: string, meta: Record<string, NodeMeta>, ids: string[]): Set<string> {
@@ -86,6 +88,7 @@ export function Canvas() {
           id: `${meta[n.id]!.parentId}>${n.id}`,
           source: meta[n.id]!.parentId!,
           target: n.id,
+          type: 'qaEdge',
           selected: selEdge?.target === n.id && selEdge.source === meta[n.id]!.parentId,
         })),
     [ordered, meta, nodes, selEdge],
@@ -153,6 +156,7 @@ export function Canvas() {
         nodes={rfNodes}
         edges={rfEdges}
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
         onInit={setRf}
         onNodesChange={onNodesChange}
         onNodeDragStart={() => pushHistory()}

@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="zh-TW">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>歡迎使用 Radial AI for Gemini</title>
+    <style>
+      :root {
+        --accent: #2563eb;
+        --fg: #0f172a;
+        --muted: #64748b;
+        --border: #e2e8f0;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: 'Google Sans', Roboto, -apple-system, system-ui, sans-serif;
+        color: var(--fg);
+        background: linear-gradient(160deg, #eff6ff, #fdf2f8);
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 32px;
+      }
+      .card {
+        background: #fff;
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        box-shadow: 0 12px 40px rgba(15, 23, 42, 0.12);
+        max-width: 560px;
+        width: 100%;
+        padding: 32px 36px;
+      }
+      .head { display: flex; align-items: center; gap: 14px; margin-bottom: 6px; }
+      .head img { width: 44px; height: 44px; border-radius: 10px; }
+      h1 { font-size: 22px; margin: 0; }
+      .sub { color: var(--muted); font-size: 14px; margin: 4px 0 24px; }
+      ol { padding: 0; margin: 0; list-style: none; counter-reset: step; }
+      li {
+        counter-increment: step;
+        display: flex;
+        gap: 14px;
+        padding: 14px 0;
+        border-top: 1px solid var(--border);
+      }
+      li::before {
+        content: counter(step);
+        flex: 0 0 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: var(--accent);
+        color: #fff;
+        font-weight: 700;
+        font-size: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .li-body strong { display: block; font-size: 15px; margin-bottom: 3px; }
+      .li-body span { font-size: 13px; color: var(--muted); line-height: 1.5; }
+      .cta {
+        display: inline-block;
+        margin-top: 24px;
+        background: var(--accent);
+        color: #fff;
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 15px;
+        padding: 11px 22px;
+        border-radius: 10px;
+      }
+      .kbd {
+        font-size: 12px;
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        padding: 1px 5px;
+        color: var(--muted);
+      }
+      .note { font-size: 12px; color: var(--muted); margin-top: 18px; line-height: 1.6; }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <div class="head">
+        <img src="icons/icon128.png" alt="Radial AI" />
+        <h1>歡迎使用 Radial AI for Gemini</h1>
+      </div>
+      <p class="sub">把線性的 Gemini 對話,變成一張可整理、可分支的節點畫布。</p>
+      <ol>
+        <li>
+          <div class="li-body">
+            <strong>① 打開 Gemini</strong>
+            <span>到 <b>gemini.google.com</b> 開啟任一個對話。</span>
+          </div>
+        </li>
+        <li>
+          <div class="li-body">
+            <strong>② 點工具列上的 Radial AI 圖示</strong>
+            <span>面板會在 Gemini 頁面右側展開,並自動把目前對話畫成節點。可拖分隔線調整寬窄、停靠四邊。</span>
+          </div>
+        </li>
+        <li>
+          <div class="li-body">
+            <strong>③（選用）設定免費 API 金鑰</strong>
+            <span>在面板右上 ⚙ 貼上你的 <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer">免費 Gemini API 金鑰</a>,即可自動為節點產生主題標題。</span>
+          </div>
+        </li>
+      </ol>
+      <a class="cta" href="https://gemini.google.com/app" target="_blank" rel="noreferrer">前往 Gemini →</a>
+      <p class="note">
+        小抄:在 Gemini 回應上選字 → 引用 <span class="kbd">⌘K</span> / 螢光筆
+        <span class="kbd">H</span> / 筆記 <span class="kbd">D</span>。畫布上點線可刪除分支、<span class="kbd">⌘Z</span> 復原。
+        <br />你的資料只存在本機;金鑰只用於呼叫 Google 的 Gemini API。
+      </p>
+    </div>
+  </body>
+</html>

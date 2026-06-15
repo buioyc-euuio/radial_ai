@@ -125,11 +125,11 @@ function build() {
     <div class="radial-dock-bar">
       <span class="radial-dock-title">Radial AI</span>
       <span class="radial-dock-spacer"></span>
-      <button data-dock="left"   title="停靠左">⬅</button>
-      <button data-dock="right"  title="停靠右">➡</button>
-      <button data-dock="top"    title="停靠上">⬆</button>
-      <button data-dock="bottom" title="停靠下">⬇</button>
-      <button data-dock="close"  title="關閉">✕</button>
+      <button data-dock="left"   title="停靠左" aria-label="停靠左">⬅</button>
+      <button data-dock="right"  title="停靠右" aria-label="停靠右">➡</button>
+      <button data-dock="top"    title="停靠上" aria-label="停靠上">⬆</button>
+      <button data-dock="bottom" title="停靠下" aria-label="停靠下">⬇</button>
+      <button data-dock="close"  title="關閉"   aria-label="關閉面板">✕</button>
     </div>
     <iframe class="radial-frame" src="${chrome.runtime.getURL('sidepanel.html')}" allow="clipboard-write"></iframe>
     <div class="radial-resizer"></div>`

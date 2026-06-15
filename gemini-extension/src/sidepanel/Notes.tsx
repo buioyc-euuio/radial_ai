@@ -8,6 +8,7 @@ import type { SavedMark } from '../shared/messages'
 export function Notes() {
   const { conversationId, nodes } = useStore()
   const [marks, setMarks] = useState<SavedMark[]>([])
+  const [orphans, setOrphans] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     if (!conversationId) {
@@ -45,9 +46,25 @@ export function Notes() {
   return (
     <div className="notes">
       {ordered.map((m) => (
-        <button key={m.id} className="note-card" onClick={() => jumpMark(m.id)} title="跳到對應文字">
+        <button
+          key={m.id}
+          className="note-card"
+          title="跳到對應文字"
+          onClick={async () => {
+            const ok = await jumpMark(m.id)
+            setOrphans((prev) => {
+              const next = new Set(prev)
+              if (ok) next.delete(m.id)
+              else next.add(m.id)
+              return next
+            })
+          }}
+        >
           <div className="note-quote">{m.text}</div>
           {m.note && <div className="note-body">{m.note}</div>}
+          {orphans.has(m.id) && (
+            <div className="note-orphan">⚠ 目前回應中找不到對應文字（可能已重新生成）</div>
+          )}
         </button>
       ))}
     </div>

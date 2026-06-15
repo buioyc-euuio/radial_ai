@@ -9,6 +9,8 @@ export interface NodeMeta {
   /** Parent in the branch tree. Defaults to the previous node (linear). */
   parentId: string | null
   topic?: string
+  /** User-given node name (overrides the summary/question as the label). */
+  name?: string
   /** AI-generated topic title for glanceability. */
   summary?: string
   status: ReadStatus
@@ -27,6 +29,7 @@ interface StoreState extends PersistShape {
   selectedId: string | null
   loaded: boolean
   loading: boolean
+  importError: string | null
   apiKey: string
   model: string
   autoSummary: boolean
@@ -38,11 +41,13 @@ interface StoreState extends PersistShape {
   ) => void
   setSelected: (id: string | null) => void
   setTopic: (id: string, topic: string) => void
+  setName: (id: string, name: string) => void
   setParent: (id: string, parentId: string | null) => void
   cycleStatus: (id: string) => void
   setPosition: (id: string, x: number, y: number) => void
   persistNow: () => void
   setLoading: (v: boolean) => void
+  setImportError: (e: string | null) => void
   pushHistory: () => void
   undo: () => void
   setSettings: (apiKey: string, model: string, autoSummary: boolean) => void
@@ -76,6 +81,7 @@ export const useStore = create<StoreState>((set, get) => ({
   selectedId: null,
   loaded: false,
   loading: false,
+  importError: null,
   apiKey: '',
   model: DEFAULT_MODEL,
   autoSummary: true,
@@ -122,7 +128,7 @@ export const useStore = create<StoreState>((set, get) => ({
     })
 
     const shape: PersistShape = { conversationId, nodes: incoming, meta }
-    set(shape)
+    set({ ...shape, importError: null })
     persist(shape)
   },
 
@@ -132,6 +138,14 @@ export const useStore = create<StoreState>((set, get) => ({
     get().pushHistory()
     const cur = get().meta[id] ?? DEFAULT_META()
     const meta = { ...get().meta, [id]: { ...cur, topic: topic || undefined } }
+    set({ meta })
+    persist({ conversationId: get().conversationId, nodes: get().nodes, meta })
+  },
+
+  setName: (id, name) => {
+    get().pushHistory()
+    const cur = get().meta[id] ?? DEFAULT_META()
+    const meta = { ...get().meta, [id]: { ...cur, name: name || undefined } }
     set({ meta })
     persist({ conversationId: get().conversationId, nodes: get().nodes, meta })
   },
@@ -163,6 +177,8 @@ export const useStore = create<StoreState>((set, get) => ({
   },
 
   setLoading: (v) => set({ loading: v }),
+
+  setImportError: (e) => set({ importError: e }),
 
   pushHistory: () => {
     history.push({ ...get().meta })

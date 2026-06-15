@@ -1,15 +1,23 @@
 import { defineManifest } from '@crxjs/vite-plugin'
 
 // Single source of truth for the extension manifest.
-// Icons intentionally omitted in Phase 0 (Chrome falls back to a default).
+const ICONS = {
+  '16': 'icons/icon16.png',
+  '32': 'icons/icon32.png',
+  '48': 'icons/icon48.png',
+  '128': 'icons/icon128.png',
+}
+
 export default defineManifest({
   manifest_version: 3,
   name: 'Radial AI for Gemini',
   version: '0.1.0',
   description:
     'Turn a linear Gemini conversation into a radial canvas directory — import QA nodes, draw your own branches, jump back to any message.',
+  icons: ICONS,
   action: {
     default_title: 'Radial AI for Gemini',
+    default_icon: ICONS,
   },
   background: {
     service_worker: 'src/background/background.ts',

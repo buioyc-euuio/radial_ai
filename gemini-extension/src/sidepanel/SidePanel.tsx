@@ -14,7 +14,10 @@ let importGen = 0
 async function runImport(): Promise<boolean> {
   const gen = importGen
   const res = await requestImport()
-  if (!res.ok) return false
+  if (!res.ok) {
+    useStore.getState().setImportError(res.error)
+    return false
+  }
   let branchParent: string | null | undefined
   if (res.conversationId) {
     const k = `pendingBranch:${res.conversationId}`
@@ -44,10 +47,11 @@ async function autoImportAndSummarize() {
 }
 
 export function SidePanel() {
-  const { nodes, apiKey, hydrate, setLoading } = useStore()
+  const { nodes, apiKey, importError, hydrate, setLoading } = useStore()
   const [error, setError] = useState<string | null>(null)
   const [importing, setImporting] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [helpOpen, setHelpOpen] = useState(false)
   const [sumProgress, setSumProgress] = useState<string | null>(null)
   const [tab, setTab] = useState<'canvas' | 'notes'>('canvas')
 
@@ -122,16 +126,56 @@ export function SidePanel() {
           Radial AI <span className="for">for Gemini</span>
         </h1>
         <div className="head-actions">
-          <button className="gear" onClick={refresh} title="重新整理" disabled={importing}>
+          <button
+            className="gear"
+            onClick={() => setHelpOpen((v) => !v)}
+            title="快捷鍵說明"
+            aria-label="快捷鍵說明"
+          >
+            ?
+          </button>
+          <button
+            className="gear"
+            onClick={refresh}
+            title="重新整理"
+            aria-label="重新整理"
+            disabled={importing}
+          >
             ↻
           </button>
-          <button className="gear" onClick={() => setSettingsOpen((v) => !v)} title="設定">
+          <button
+            className="gear"
+            onClick={() => setSettingsOpen((v) => !v)}
+            title="設定"
+            aria-label="設定"
+          >
             ⚙
           </button>
         </div>
       </header>
 
       {settingsOpen && <Settings onClose={() => setSettingsOpen(false)} />}
+      {helpOpen && (
+        <div className="help">
+          <div className="settings-head">
+            <strong>快捷鍵</strong>
+            <button className="ins-close" onClick={() => setHelpOpen(false)} aria-label="關閉">
+              ✕
+            </button>
+          </div>
+          <ul>
+            <li>
+              <b>在 Gemini 回應上選字：</b>引用 <kbd>⌘K</kbd>/<kbd>L</kbd>/<kbd>C</kbd>/<kbd>E</kbd>、螢光筆 <kbd>H</kbd>、筆記 <kbd>D</kbd>
+            </li>
+            <li>
+              <b>畫布：</b>點線→中間 <kbd>✕</kbd> 或 <kbd>Delete</kbd> 刪分支、<kbd>⌘Z</kbd> 復原
+            </li>
+            <li>
+              <b>節點：</b>點一下＝跳到 Gemini 訊息;點圓點＝切換閱讀狀態;從邊緣拉線＝建立分支;點線＝選整條分支一起拖
+            </li>
+          </ul>
+        </div>
+      )}
 
       {nodes.length > 0 && (
         <div className="actions">
@@ -149,10 +193,11 @@ export function SidePanel() {
       {error && <p className="error">{error}</p>}
 
       {nodes.length === 0 && (
-        <p className="hint">
+        <p className={importError ? 'error' : 'hint'}>
           {importing
             ? '匯入中…'
-            : '在 Gemini 開啟一個對話，節點會自動匯入；送出新問題也會自動長出節點。'}
+            : (importError ??
+              '在 Gemini 開啟一個對話，節點會自動匯入；送出新問題也會自動長出節點。')}
         </p>
       )}
 

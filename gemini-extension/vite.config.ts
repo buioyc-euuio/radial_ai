@@ -11,7 +11,7 @@ export default defineConfig({
   plugins: [react(), crx({ manifest })],
   build: {
     rollupOptions: {
-      input: { sidepanel: 'sidepanel.html' },
+      input: { sidepanel: 'sidepanel.html', onboarding: 'onboarding.html' },
     },
   },
   server: {

@@ -4,7 +4,7 @@ import { jumpTo } from './gemini-bridge'
 
 /** Controls for the selected node: AI summary + topic tag + re-parent + jump. */
 export function Inspector() {
-  const { nodes, meta, selectedId, apiKey, setTopic, setParent, setSelected, summarizeNode } =
+  const { nodes, meta, selectedId, apiKey, setTopic, setName, setParent, setSelected, summarizeNode } =
     useStore()
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
@@ -35,8 +35,8 @@ export function Inspector() {
   return (
     <div className="inspector">
       <div className="ins-head">
-        <span className="ins-idx">#{idx + 1}</span>
-        {m?.summary && <span className="ins-summary">{m.summary}</span>}
+        <span className="ins-idx">{idx + 1}</span>
+        {(m?.name || m?.summary) && <span className="ins-summary">{m.name ?? m.summary}</span>}
         <button className="ins-jump" onClick={() => jumpTo(selectedId)}>
           跳到訊息 ↗
         </button>
@@ -46,6 +46,19 @@ export function Inspector() {
       </div>
 
       <div className="ins-q">{node.question || '（圖片／無文字提問）'}</div>
+
+      <label className="ins-field">
+        <span>名稱</span>
+        <input
+          key={selectedId + '-name'}
+          defaultValue={m?.name ?? ''}
+          placeholder="自訂節點名稱…"
+          onBlur={(e) => setName(selectedId, e.target.value.trim())}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+          }}
+        />
+      </label>
 
       <div className="ins-field">
         <span>摘要</span>
@@ -85,7 +98,7 @@ export function Inspector() {
             const label = p.question.slice(0, 20) || '（圖片）'
             return (
               <option key={p.id} value={p.id}>
-                #{pi + 1} {label}
+                {pi + 1}　{label}
               </option>
             )
           })}

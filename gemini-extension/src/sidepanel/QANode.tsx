@@ -54,14 +54,16 @@ function QANodeImpl({ id, data }: NodeProps) {
           cycleStatus(id)
         }}
       />
-      <span className="qa-num">#{index + 1}</span>
-      {m?.summary ? (
+      <span className="qa-num">{index + 1}</span>
+      {m?.name ? (
+        <span className="qa-summary">{m.name}</span>
+      ) : m?.summary ? (
         <span className="qa-summary" title="已 AI 摘要">
           <span className="qa-ai">✨</span>
           {m.summary}
         </span>
       ) : (
-        // Fallback when there's no AI summary: show the QA text itself.
+        // Fallback when there's no name/summary: show the QA text itself.
         <span className="qa-summary dim">{(n.question || n.answerText || '（無文字）').slice(0, 22)}</span>
       )}
 
