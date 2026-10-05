@@ -35,7 +35,9 @@ const MODEL_GROUPS = [
   },
 ];
 
-const DEV_GEMINI_KEY = import.meta.env.VITE_GOOGLE_API_KEY as string | undefined;
+// Local development only. Gated on DEV so a VITE_GOOGLE_API_KEY set in the
+// hosting environment is never inlined into the public production bundle.
+const DEV_GEMINI_KEY = import.meta.env.DEV ? import.meta.env.VITE_GOOGLE_API_KEY as string | undefined : undefined;
 const DEV_MODE_AVAILABLE = !!DEV_GEMINI_KEY && DEV_GEMINI_KEY !== 'your_gemini_api_key_here';
 
 // Server-side locks dev-key routing (whitelist + free trial) to this single model.
@@ -293,7 +295,7 @@ export default function ApiKeyModal({ onClose }: { onClose: () => void }) {
                   style={{ ...inputStyle, opacity: 0.6 }}
                 />
                 <p className="text-[10px] mt-1.5" style={{ color: 'var(--text-faint)' }}>
-                  🔒 {trialActive
+                  💸 雅安付費的喔 · 🔒 {trialActive
                     ? '免費試用使用內建金鑰，模型鎖定為 Gemini Flash Lite'
                     : '使用開發者提供的 API Key，無法修改'}
                 </p>
@@ -503,7 +505,7 @@ export default function ApiKeyModal({ onClose }: { onClose: () => void }) {
               >
                 <span className={`w-1.5 h-1.5 rounded-full ${devModeActive ? 'animate-pulse' : ''}`}
                   style={{ background: devModeActive ? '#f59e0b' : 'var(--text-faint)' }} />
-                {devModeActive ? 'Local Dev Key Active' : 'Local Dev Key'}
+                {devModeActive ? 'Local Dev Key Active · 雅安付費的喔' : 'Local Dev Key'}
               </button>
             )}
           </div>

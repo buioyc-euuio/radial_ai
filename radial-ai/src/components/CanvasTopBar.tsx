@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useCanvasStore, getModelProvider } from '../store/canvasStore';
+import { useAuthStore, hasDevKeyAccess } from '../store/authStore';
 import { computeNodeNumbers } from '../utils/nodeNumbers';
 import { buildCanvasJSON, buildCanvasMarkdown, safeFileStem, downloadText } from '../utils/exportImport';
 import logo from '../assets/logo-transparent.png';
@@ -139,6 +140,8 @@ export default function CanvasTopBar({ viewMode, setViewMode, onOpenApiModal, on
 
   const activeProvider = getModelProvider(model);
   const activeKeySet = activeProvider === 'google' ? !!geminiApiKey : !!apiKey;
+  // Requests are going through the developer's paid key (whitelist / trial / pass).
+  const usingDevKey = useAuthStore((s) => s.devMode && hasDevKeyAccess(s) && !!s.credential);
   const modelShortName = model.includes('gemini')
     ? model.replace('gemini-', 'Gemini ').split('-').slice(0, 3).join(' ')
     : model.split('-').slice(0, 3).join(' ');
@@ -321,7 +324,12 @@ export default function CanvasTopBar({ viewMode, setViewMode, onOpenApiModal, on
         <button
           onClick={onOpenApiModal}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all"
-          style={activeKeySet ? {
+          title={usingDevKey ? '目前使用開發者（雅安）的付費 API Key' : undefined}
+          style={usingDevKey ? {
+            background: 'linear-gradient(135deg, #fef3c7, #fde68a)',
+            color: '#92400e',
+            border: '1px solid #fcd34d',
+          } : activeKeySet ? {
             background: activeProvider === 'google'
               ? 'linear-gradient(135deg, #d1fae5, #a7f3d0)'
               : 'linear-gradient(135deg, #fce7f3, #dbeafe)',
@@ -333,9 +341,10 @@ export default function CanvasTopBar({ viewMode, setViewMode, onOpenApiModal, on
             border: '1px solid #fecdd3',
           }}
         >
-          <span>{activeKeySet ? '⚙' : '⚠'}</span>
+          <span>{usingDevKey ? '💸' : activeKeySet ? '⚙' : '⚠'}</span>
           <span className="hidden sm:inline">
-            {activeKeySet ? `${activeProvider === 'google' ? 'Gemini' : 'Claude'} · ${modelShortName}` : 'Set API Key'}
+            {usingDevKey ? '雅安付費的喔'
+              : activeKeySet ? `${activeProvider === 'google' ? 'Gemini' : 'Claude'} · ${modelShortName}` : 'Set API Key'}
           </span>
         </button>
       </div>
