@@ -2,6 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { kv } from '@vercel/kv';
 import { verifyEmail, checkWhitelisted } from './_whitelist.js';
 import { getTrialStatus } from './_trial.js';
+import { getPassStatus } from './_pass.js';
 import { DEFAULT_GEMINI_MODEL, geminiGenerateContent } from './_geminiModels.js';
 
 const PROD_API_KEY = process.env.PROD_API_KEY ?? '';
@@ -44,13 +45,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // prompt a fresh sign-in instead of a misleading "not whitelisted".
   if (!email) return res.status(401).json({ error: '登入已過期，請重新登入', code: 'AUTH_EXPIRED' });
 
-  // Access to the developer key is granted to whitelisted users OR anyone
-  // within an active 3-day free trial. The trial clock is only started via the
-  // explicit opt-in (/api/activate-trial), never silently here.
-  const whitelisted = await checkWhitelisted(email);
-  const trialActive = whitelisted || (await getTrialStatus(email)).active;
-  if (!whitelisted && !trialActive) {
-    return res.status(403).json({ error: '免費試用已結束，且不在白名單中', code: 'NO_ACCESS' });
+  // Access to the developer key is granted to whitelisted users, anyone within
+  // an active 3-day free trial, or anyone holding a developer-approved one-hour
+  // pass. The trial clock is only started via the explicit opt-in
+  // (/api/activate-trial), never silently here.
+  const hasAccess = (await checkWhitelisted(email))
+    || (await getTrialStatus(email)).active
+    || (await getPassStatus(email)).active;
+  if (!hasAccess) {
+    return res.status(403).json({ error: '免費試用或一小時通行已結束，請重新申請或改用自己的 API Key', code: 'NO_ACCESS' });
   }
 
   if (!PROD_API_KEY) return res.status(503).json({ error: 'Server API key not configured' });

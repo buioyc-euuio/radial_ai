@@ -8,7 +8,7 @@ import { LOCKED_MODEL } from './ApiKeyModal';
 // expired (~1h lifetime). Lets the user re-authenticate in place without losing
 // their canvas, instead of seeing a misleading "not whitelisted" error.
 export default function ReloginBanner() {
-  const { authExpired, user, login, setWhitelisted, setTrial, setDevMode, logout } = useAuthStore();
+  const { authExpired, user, login, setWhitelisted, setTrial, setPass, setDevMode, logout } = useAuthStore();
   const setModel = useCanvasStore((s) => s.setModel);
 
   if (!authExpired) return null;
@@ -17,10 +17,11 @@ export default function ReloginBanner() {
     if (!resp.credential) return;
     const payload = decodeJwt(resp.credential);
     login({ name: payload.name, email: payload.email, picture: payload.picture }, resp.credential);
-    const { isWhitelisted: wl, trial: t } = await fetchAccessStatus(resp.credential);
+    const { isWhitelisted: wl, trial: t, pass: p } = await fetchAccessStatus(resp.credential);
     setWhitelisted(wl);
     setTrial(t);
-    if (!wl && t?.active) { setDevMode(true); setModel(LOCKED_MODEL); }
+    setPass(p);
+    if (!wl && (t?.active || p?.active)) { setDevMode(true); setModel(LOCKED_MODEL); }
   };
 
   return (

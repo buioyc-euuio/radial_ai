@@ -2,7 +2,7 @@ import { useState, useRef } from 'react';
 import { GoogleLogin, type CredentialResponse } from '@react-oauth/google';
 import { useCanvasStore } from '../store/canvasStore';
 import { parseCanvasImport } from '../utils/exportImport';
-import { useAuthStore, activateTrial, type GoogleUser, type TrialStatus } from '../store/authStore';
+import { useAuthStore, activateTrial, type GoogleUser, type TrialStatus, type PassStatus } from '../store/authStore';
 import ApiKeyModal, { LOCKED_MODEL } from './ApiKeyModal';
 import UsageBar from './UsageBar';
 import { getModelProvider } from '../store/canvasStore';
@@ -20,16 +20,16 @@ export function decodeJwt(token: string): Record<string, string> {
 // no redirect URI configuration required in Google Cloud Console.
 export async function fetchAccessStatus(
   credential: string,
-): Promise<{ isWhitelisted: boolean; trial: TrialStatus | null }> {
+): Promise<{ isWhitelisted: boolean; trial: TrialStatus | null; pass: PassStatus | null }> {
   try {
     const r = await fetch('/api/check-whitelist', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ credential }),
     });
-    const data = await r.json() as { isWhitelisted?: boolean; trial?: TrialStatus | null };
-    return { isWhitelisted: data.isWhitelisted ?? false, trial: data.trial ?? null };
-  } catch { return { isWhitelisted: false, trial: null }; }
+    const data = await r.json() as { isWhitelisted?: boolean; trial?: TrialStatus | null; pass?: PassStatus | null };
+    return { isWhitelisted: data.isWhitelisted ?? false, trial: data.trial ?? null, pass: data.pass ?? null };
+  } catch { return { isWhitelisted: false, trial: null, pass: null }; }
 }
 
 
@@ -202,18 +202,19 @@ function WhitelistDebugToggle() {
 
 export default function HomePage() {
   const { projects, createProject, openProject, deleteProject, renameProject, importProject, apiKey, geminiApiKey, model, setModel, theme, toggleTheme } = useCanvasStore();
-  const { user, login, logout, isWhitelisted, setWhitelisted, trial, setTrial, setDevMode,
+  const { user, login, logout, isWhitelisted, setWhitelisted, trial, setTrial, setPass, setDevMode,
     credential, trialPromptDismissed, setTrialPromptDismissed } = useAuthStore();
   const [showTrialOptIn, setShowTrialOptIn] = useState(false);
   const [activating, setActivating] = useState(false);
 
   const handleLogin = async (u: GoogleUser, credential: string) => {
     login(u, credential);
-    const { isWhitelisted: wl, trial: t } = await fetchAccessStatus(credential);
+    const { isWhitelisted: wl, trial: t, pass: p } = await fetchAccessStatus(credential);
     setWhitelisted(wl);
     setTrial(t);
+    setPass(p);
     if (wl) return;
-    if (t?.active) {
+    if (t?.active || p?.active) {
       // Returning mid-trial: resume dev-key routing (model locked to Flash Lite).
       setDevMode(true);
       setModel(LOCKED_MODEL);

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useCanvasStore } from '../store/canvasStore';
 import { getModelProvider } from '../store/canvasStore';
 import { DEFAULT_GEMINI_MODEL } from '../../api/_geminiModels';
-import { useAuthStore, hasDevKeyAccess, isTrialEligible, activateTrial, formatTrialExpiry } from '../store/authStore';
+import { useAuthStore, hasDevKeyAccess, isPassActive, isTrialEligible, activateTrial, requestHourPass, fetchPassStatus, formatTrialExpiry, type PassStatus } from '../store/authStore';
 
 const MONTHLY_BUDGET = 5.0;
 
@@ -43,13 +43,16 @@ export const LOCKED_MODEL = DEFAULT_GEMINI_MODEL;
 
 export default function ApiKeyModal({ onClose }: { onClose: () => void }) {
   const { apiKey, geminiApiKey, model, setApiKey, setGeminiApiKey, setModel, theme } = useCanvasStore();
-  const { isWhitelisted, trial, devMode, setDevMode, credential, setTrial } = useAuthStore();
-  const canUseDevKey = hasDevKeyAccess({ isWhitelisted, trial });
+  const { isWhitelisted, trial, pass, devMode, setDevMode, credential, setTrial, setPass } = useAuthStore();
+  const canUseDevKey = hasDevKeyAccess({ isWhitelisted, trial, pass });
   const trialActive = !isWhitelisted && !!trial?.active;
+  // Approved one-hour pass (only relevant once the trial no longer covers them).
+  const passActive = !isWhitelisted && !trialActive && isPassActive(pass);
+  const passPending = !!pass?.pending && !passActive;
   const trialExpired = !isWhitelisted && !!trial && trial.startedAt != null && !trial.active;
   const eligible = isTrialEligible({ isWhitelisted, trial });
   // Trial users see "免費試用 / Free Trial"; whitelisted testers see "開發者模式".
-  const accessLabel = trialActive ? '免費試用' : 'Developer Mode';
+  const accessLabel = trialActive ? '免費試用' : passActive ? '一小時通行' : 'Developer Mode';
   const lockedActive = devMode && canUseDevKey;  // routing through the locked dev key
   const [anthropicInput, setAnthropicInput] = useState(apiKey);
   const [geminiInput, setGeminiInput] = useState(geminiApiKey);
@@ -57,6 +60,35 @@ export default function ApiKeyModal({ onClose }: { onClose: () => void }) {
   const [devModeActive, setDevModeActive] = useState(false);
   const [personalCost, setPersonalCost] = useState<number | null>(null);
   const [activating, setActivating] = useState(false);
+  const [requesting, setRequesting] = useState(false);
+  const [passError, setPassError] = useState<string | null>(null);
+
+  const applyPass = (p: PassStatus | null) => {
+    setPass(p);
+    if (p?.active) { setDevMode(true); setModel(LOCKED_MODEL); }
+  };
+
+  const handleRequestPass = async () => {
+    if (!credential) return;
+    setRequesting(true);
+    setPassError(null);
+    const { pass: p, error } = await requestHourPass(credential);
+    setRequesting(false);
+    if (error) setPassError(error);
+    else applyPass(p);
+  };
+
+  // While waiting for the developer's approval, poll until the pass turns
+  // active (or the request lapses).
+  useEffect(() => {
+    if (!passPending || !credential) return;
+    const timer = setInterval(async () => {
+      const p = await fetchPassStatus(credential);
+      if (p) applyPass(p);
+    }, 5000);
+    return () => clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- applyPass only wraps stable store setters
+  }, [passPending, credential]);
 
   // Fetch this user's usage when they have (or had) dev-key access.
   const canSeeUsage = !!credential && (isWhitelisted || (trial?.startedAt != null));
@@ -344,11 +376,13 @@ export default function ApiKeyModal({ onClose }: { onClose: () => void }) {
               <div className="flex items-center justify-between px-1">
                 <div>
                   <p className="text-xs font-semibold" style={{ color: isDark ? '#fbbf24' : '#92400e' }}>
-                    {trialActive ? `免費試用中 · 剩 ${trial?.daysLeft} 天` : 'Developer Mode'}
+                    {trialActive ? `免費試用中 · 剩 ${trial?.daysLeft} 天`
+                      : passActive ? `一小時通行中 · 至 ${formatTrialExpiry(pass?.expiresAt ?? null).slice(-5)}`
+                      : 'Developer Mode'}
                   </p>
                   <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-faint)' }}>
                     {devMode
-                      ? (trialActive ? '免費試用金鑰 · 鎖定 Gemini Flash Lite' : '使用開發者 API Key（模型已鎖定）')
+                      ? (trialActive || passActive ? '開發者金鑰 · 鎖定 Gemini Flash Lite' : '使用開發者 API Key（模型已鎖定）')
                       : '使用你自己的 API Key'}
                   </p>
                 </div>
@@ -415,8 +449,24 @@ export default function ApiKeyModal({ onClose }: { onClose: () => void }) {
                   </span>
                 </div>
                 <p className="text-[10px]" style={{ color: 'var(--text-faint)' }}>
-                  試用已於 {formatTrialExpiry(trial?.expiresAt ?? null)} 到期。請改用自己的 API Key。
+                  試用已於 {formatTrialExpiry(trial?.expiresAt ?? null)} 到期。請改用自己的 API Key，或向開發者申請一小時使用。
                 </p>
+                <button
+                  onClick={handleRequestPass}
+                  disabled={requesting || passPending}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold text-white transition-all hover:opacity-90"
+                  style={{ background: 'linear-gradient(90deg,#f472b6,#60a5fa)', opacity: requesting || passPending ? 0.6 : 1 }}
+                >
+                  {passPending ? '已通知開發者，等待核准中…' : requesting ? '送出中…' : '申請使用一小時'}
+                </button>
+                {passPending && (
+                  <p className="text-[10px]" style={{ color: 'var(--text-faint)' }}>
+                    核准後會自動開通，這個視窗可以先開著。
+                  </p>
+                )}
+                {passError && (
+                  <p className="text-[10px]" style={{ color: '#dc2626' }}>{passError}</p>
+                )}
                 {personalCost != null && (
                   <div className="flex items-center justify-between text-[10px]">
                     <span style={{ color: 'var(--text-faint)' }}>試用期間用量（本月）</span>
