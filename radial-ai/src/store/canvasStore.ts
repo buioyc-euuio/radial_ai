@@ -8,6 +8,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { get as idbGet, set as idbSet, del as idbDel } from 'idb-keyval';
 import type { NodeData, ContextCapsule, ThoughtNodeData, AnnotationNodeData, Project } from './types';
 import { useAuthStore, hasDevKeyAccess } from './authStore';
+import { DEFAULT_GEMINI_MODEL, geminiGenerateContent } from '../../api/_geminiModels';
 import { calculateOptimalPosition } from '../utils/autoLayout';
 import { isThoughtNode } from '../utils/nodeTypeGuards';
 import {
@@ -348,14 +349,12 @@ async function callGeminiAPI(
     body.system_instruction = { parts: [{ text: system }] };
   }
 
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    }
-  );
+  // Retries with a live model if `model` has been retired by Google.
+  const { res, model: usedModel } = await geminiGenerateContent(apiKey, model, body);
+  // Remember the replacement so the stale id isn't retried on every page load.
+  if (res.ok && usedModel !== model && useCanvasStore.getState().model === model) {
+    useCanvasStore.setState({ model: usedModel });
+  }
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
@@ -483,7 +482,7 @@ function buildParentLinkage(
 }
 
 // ── Auto-title via a free Gemini model (never the paid Anthropic key) ─────────
-const TITLE_MODEL = 'gemini-3.1-flash-lite-preview';
+const TITLE_MODEL = DEFAULT_GEMINI_MODEL;
 
 const TITLE_GEN_SYSTEM = `你是「思維節點標題產生器」。會收到使用者的問題、引用的參考片段、以及一段回答內容，請濃縮出一個能精準概括核心主題的標題。
 規則：
@@ -558,7 +557,7 @@ export const useCanvasStore = create<CanvasStore>()(
       // Settings
       apiKey: '',
       geminiApiKey: '',
-      model: 'gemini-3.1-flash-lite-preview',
+      model: DEFAULT_GEMINI_MODEL,
       theme: 'light',
       starterSeedVersion: STARTER_SEED_VERSION,
 
@@ -1195,6 +1194,7 @@ export const useCanvasStore = create<CanvasStore>()(
           'gemini-2.5-pro': 'gemini-3.1-pro-preview',
           'gemini-2.5-pro-preview-05-06': 'gemini-3.1-pro-preview',
           'gemini-3-pro-preview': 'gemini-3.1-pro-preview',
+          'gemini-3.1-flash-lite-preview': DEFAULT_GEMINI_MODEL,
         };
         const model = typeof p.model === 'string' ? (modelMap[p.model] ?? p.model) : current.model;
 

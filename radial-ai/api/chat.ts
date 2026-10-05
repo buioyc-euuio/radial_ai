@@ -2,9 +2,10 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { kv } from '@vercel/kv';
 import { verifyEmail, checkWhitelisted } from './_whitelist.js';
 import { getTrialStatus } from './_trial.js';
+import { DEFAULT_GEMINI_MODEL, geminiGenerateContent } from './_geminiModels.js';
 
 const PROD_API_KEY = process.env.PROD_API_KEY ?? '';
-const LOCKED_MODEL = 'gemini-3.1-flash-lite-preview';
+const LOCKED_MODEL = DEFAULT_GEMINI_MODEL;
 
 const INPUT_COST_PER_TOKEN = 0.075 / 1_000_000;
 const OUTPUT_COST_PER_TOKEN = 0.30 / 1_000_000;
@@ -62,10 +63,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const body: Record<string, unknown> = { contents };
   if (system) body.system_instruction = { parts: [{ text: system }] };
 
-  const geminiRes = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${LOCKED_MODEL}:generateContent?key=${PROD_API_KEY}`,
-    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
-  );
+  // Self-heals if LOCKED_MODEL has been retired (stays within the Flash tiers).
+  const { res: geminiRes } = await geminiGenerateContent(PROD_API_KEY, LOCKED_MODEL, body);
 
   const data = await geminiRes.json() as {
     usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number };

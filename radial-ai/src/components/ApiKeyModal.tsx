@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useCanvasStore } from '../store/canvasStore';
 import { getModelProvider } from '../store/canvasStore';
+import { DEFAULT_GEMINI_MODEL } from '../../api/_geminiModels';
 import { useAuthStore, hasDevKeyAccess, isTrialEligible, activateTrial, formatTrialExpiry } from '../store/authStore';
 
 const MONTHLY_BUDGET = 5.0;
@@ -27,7 +28,7 @@ const MODEL_GROUPS = [
     models: [
       { id: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro', devOnly: true },
       { id: 'gemini-3-flash-preview', label: 'Gemini 3 Flash', devOnly: false },
-      { id: 'gemini-3.1-flash-lite-preview', label: 'Gemini 3.1 Flash Lite', devOnly: false, recommended: true },
+      { id: DEFAULT_GEMINI_MODEL, label: 'Gemini 3.1 Flash Lite', devOnly: false, recommended: true },
       { id: 'gemma-3-27b-it', label: 'Gemma 3 27B', devOnly: false },
       { id: 'gemma-4-31b-it', label: 'Gemma 4 31B', devOnly: false },
     ],
@@ -38,7 +39,7 @@ const DEV_GEMINI_KEY = import.meta.env.VITE_GOOGLE_API_KEY as string | undefined
 const DEV_MODE_AVAILABLE = !!DEV_GEMINI_KEY && DEV_GEMINI_KEY !== 'your_gemini_api_key_here';
 
 // Server-side locks dev-key routing (whitelist + free trial) to this single model.
-export const LOCKED_MODEL = 'gemini-3.1-flash-lite-preview';
+export const LOCKED_MODEL = DEFAULT_GEMINI_MODEL;
 
 export default function ApiKeyModal({ onClose }: { onClose: () => void }) {
   const { apiKey, geminiApiKey, model, setApiKey, setGeminiApiKey, setModel, theme } = useCanvasStore();
